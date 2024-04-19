@@ -339,7 +339,7 @@ class HasEnvironment:
         kernel_invariants = getattr(self, "kernel_invariants", set())
         self.kernel_invariants = kernel_invariants | {key}
 
-    @rpc(flags={"async"})
+    @rpc # NAC3TODO (flags={"async"})
     def set_dataset(self, key, value, *,
                     unit=None, scale=None, precision=None,
                     broadcast=False, persist=False, archive=True):
