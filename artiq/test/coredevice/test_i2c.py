@@ -47,6 +47,7 @@ class NonexistentI2CBus(EnvExperiment):
         self.broken_switch.set(0)
 
 
+@unittest.skip("NAC3TODO https://git.m-labs.hk/M-Labs/nac3/issues/51")
 class I2CTest(ExperimentCase):
     def test_i2c_switch(self):
         self.execute(I2CSwitchTest)

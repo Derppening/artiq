@@ -48,6 +48,7 @@ class DMARecordContextManager:
     """
     name: Kernel[str]
     saved_now_mu: Kernel[int64]
+    enable_ddma: Kernel[bool]
 
     def __init__(self):
         self.name = ""
@@ -114,14 +115,14 @@ class CoreDMA:
         delay_mu(advance_mu)
 
     @kernel
-    def get_handle(self, name: str) -> tuple[int32, int64, int32]:
+    def get_handle(self, name: str) -> tuple[int32, int64, int32, bool]:
         """Returns a handle to a previously recorded DMA trace. The returned handle
         is only valid until the next call to :meth:`record` or :meth:`erase`."""
         (advance_mu, ptr, uses_ddma) = dma_retrieve(name)
         return (self.epoch, advance_mu, ptr, uses_ddma)
 
     @kernel
-    def playback_handle(self, handle: tuple[int32, int64, int32]):
+    def playback_handle(self, handle: tuple[int32, int64, int32, bool]):
         """Replays a handle obtained with :meth:`get_handle`. Using this function
         is much faster than :meth:`playback` for replaying a set of traces repeatedly,
         but incurs the overhead of managing the handles onto the programmer."""

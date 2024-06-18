@@ -1,7 +1,11 @@
 from operator import itemgetter
 from fractions import Fraction
+from numpy import int32, int64
+import unittest
 
+from artiq.coredevice.core import Core
 from artiq.experiment import *
+from artiq.language.core import *
 from artiq.sim import devices as sim_devices
 from artiq.test.hardware_testbench import ExperimentCase
 
@@ -16,13 +20,17 @@ def _run_on_host(k_class, *args, **kwargs):
     return k_inst
 
 
+@nac3
 class _Primes(EnvExperiment):
+    maximum: KernelInvariant[int32]
+
     def build(self, output_list, maximum):
         self.setattr_device("core")
         self.output_list = output_list
         self.maximum = maximum
 
-    def _add_output(self, x):
+    @rpc
+    def _add_output(self, x: int32):
         self.output_list.append(x)
 
     @kernel
@@ -39,8 +47,13 @@ class _Primes(EnvExperiment):
                 self._add_output(x)
 
 
+@nac3
 class _Math(EnvExperiment):
     """Test kernel math"""
+
+    core: KernelInvariant[Core]
+    x: KernelInvariant[float]
+    x_sqrt: Kernel[float]
 
     def build(self):
         self.setattr_device("core")
@@ -52,7 +65,16 @@ class _Math(EnvExperiment):
         self.x_sqrt = self.x**0.5
 
 
+@nac3
 class _Misc(EnvExperiment):
+    core: KernelInvariant[Core]
+    input: KernelInvariant[int32]
+    al: KernelInvariant[list[int32]]
+    half_input: Kernel[int32]
+    acc: Kernel[int32]
+    list_copy_in: KernelInvariant[list[float]]
+    list_copy_out: Kernel[list[float]]
+
     def build(self):
         self.setattr_device("core")
 
@@ -73,7 +95,10 @@ class _Misc(EnvExperiment):
         self.list_copy_out = self.list_copy_in
 
 
+@nac3
 class _PulseLogger(EnvExperiment):
+    core: KernelInvariant[Core]
+
     def build(self, parent_test, name):
         self.setattr_device("core")
         self.parent_test = parent_test
@@ -86,20 +111,28 @@ class _PulseLogger(EnvExperiment):
         t_usec = round(self.core.mu_to_seconds(t-origin)*1000000)
         self.parent_test.output_list.append((self.name, t_usec, l, f))
 
-    def on(self, t, f):
+    @rpc
+    def on(self, t: int64, f: int32):
         self._append(t, True, f)
 
-    def off(self, t):
+    @rpc
+    def off(self, t: int64):
         self._append(t, False, 0)
 
     @kernel
-    def pulse(self, f, duration):
+    def pulse(self, f: int32, duration: float):
         self.on(now_mu(), f)
-        delay(duration)
+        self.core.delay(duration)
         self.off(now_mu())
 
 
+@nac3
 class _Pulses(EnvExperiment):
+    a: KernelInvariant[_PulseLogger]
+    b: KernelInvariant[_PulseLogger]
+    c: KernelInvariant[_PulseLogger]
+    d: KernelInvariant[_PulseLogger]
+
     def build(self, output_list):
         self.setattr_device("core")
         self.output_list = output_list
@@ -115,29 +148,32 @@ class _Pulses(EnvExperiment):
         for i in range(3):
             with parallel:
                 with sequential:
-                    self.a.pulse(100+i, 20*us)
-                    self.b.pulse(200+i, 20*us)
+                    self.a.pulse(100+i, 20.*us)
+                    self.b.pulse(200+i, 20.*us)
                 with sequential:
-                    self.c.pulse(300+i, 10*us)
-                    self.d.pulse(400+i, 20*us)
+                    self.c.pulse(300+i, 10.*us)
+                    self.d.pulse(400+i, 20.*us)
 
 
+@nac3
 class _MyException(Exception):
     pass
 
+@nac3
 class _NestedFinally(EnvExperiment):
     def build(self, trace):
         self.setattr_device("core")
         self.trace = trace
 
-    def _trace(self, i):
+    @rpc
+    def _trace(self, i: int32):
         self.trace.append(i)
 
     @kernel
     def run(self):
         try:
             try:
-                raise ValueError
+                raise ValueError()
             finally:
                 try:
                     raise IndexError
@@ -148,19 +184,21 @@ class _NestedFinally(EnvExperiment):
         finally:
             self._trace(2)
 
+@nac3
 class _NestedExceptions(EnvExperiment):
     def build(self, trace):
         self.setattr_device("core")
         self.trace = trace
 
-    def _trace(self, i):
+    @rpc
+    def _trace(self, i: int32):
         self.trace.append(i)
 
     @kernel
     def run(self):
         try:
             try:
-                raise ValueError
+                raise ValueError()
             except _MyException:
                 self._trace(0)
                 raise
@@ -177,12 +215,14 @@ class _NestedExceptions(EnvExperiment):
         finally:
             self._trace(4)
 
+@nac3
 class _Exceptions(EnvExperiment):
     def build(self, trace):
         self.setattr_device("core")
         self.trace = trace
 
-    def _trace(self, i):
+    @rpc
+    def _trace(self, i: int32):
         self.trace.append(i)
 
     @kernel
@@ -224,13 +264,18 @@ class _Exceptions(EnvExperiment):
                 self._trace(104)
 
 
+@nac3
 class _RPCExceptions(EnvExperiment):
-    def build(self, catch):
+    catch: KernelInvariant[bool]
+    success: Kernel[bool]
+
+    def build(self, catch: bool):
         self.setattr_device("core")
         self.catch = catch
 
         self.success = False
 
+    @rpc
     def exception_raiser(self):
         raise _MyException
 
@@ -253,18 +298,20 @@ class _RPCExceptions(EnvExperiment):
             self.success = True
 
 
-class _Keywords(EnvExperiment):
-    def build(self, value, output):
-        self.setattr_device("core")
-        self.value  = value
-        self.output = output
-
-    def rpc(self, kw):
-        self.output.append(kw)
-
-    @kernel
-    def run(self):
-        self.rpc(kw=self.value)
+#@nac3
+#class _Keywords(EnvExperiment):
+#    def build(self, value, output):
+#        self.setattr_device("core")
+#        self.value  = value
+#        self.output = output
+#
+#    @rpc
+#    def rpc(self, kw):
+#        self.output.append(kw)
+#
+#    @kernel
+#    def run(self):
+#        self.rpc(kw=self.value)
 
 
 class HostVsDeviceCase(ExperimentCase):
@@ -323,6 +370,7 @@ class HostVsDeviceCase(ExperimentCase):
             uut = self.execute(_RPCExceptions, catch=True)
             self.assertTrue(uut.success)
 
+    @unittest.skip("nac3 reuse list with different generic param")
     def test_keywords(self):
         for f in self.execute, _run_on_host:
             output = []
