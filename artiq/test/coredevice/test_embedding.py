@@ -8,6 +8,14 @@ from artiq.experiment import *
 from artiq.test.hardware_testbench import ExperimentCase
 from artiq.coredevice.comm_kernel import RPCReturnValueError
 
+def np_array(object, copy=True, ndmin=0):
+    return numpy.array(object, copy=copy, ndmin=ndmin)
+
+def int64(x):
+    return numpy.int64(x)
+
+def np_sqrt(x):
+    return numpy.sqrt(x)
 
 # NAC3TODO move to artiq/language/core.py
 @rpc
@@ -187,15 +195,14 @@ class _RPCTypes(EnvExperiment):
 #    def return_range(self) -> range:
 #        return range(10)
 
-    # NAC3TODO: numpy module
-    # @rpc
-    # def return_array(self) -> ndarray[int32, 1]:
-    #     return numpy.array([1, 2])
-    #
-    # @rpc
-    # def return_matrix(self) -> ndarray[int32, 2]:
-    #     return numpy.array([[1, 2], [3, 4]])
-    #
+    @rpc
+    def return_array(self) -> ndarray[int32, 1]:
+        return numpy.array([1, 2])
+
+    @rpc
+    def return_matrix(self) -> ndarray[int32, 2]:
+        return numpy.array([[1, 2], [3, 4]])
+
     # @rpc
     # def return_mismatch(self) -> bytes:
     #     return b"foo"
@@ -252,6 +259,14 @@ class _RPCTypes(EnvExperiment):
 #    def accept_range(self, value: range):
 #        pass
 
+    @rpc
+    def accept_ndarray_i32_1(self, value: ndarray[int32, 1]):
+        pass
+
+    @rpc
+    def accept_ndarray_i32_2(self, value: ndarray[int32, 2]):
+        pass
+
     @kernel
     def run_send(self):
         self.accept_bool(True)
@@ -266,8 +281,8 @@ class _RPCTypes(EnvExperiment):
         self.accept_tuple((2, 3))
         self.accept_list([1, 2])
         # self.accept_range(range(10))
-        # self.accept(numpy.array([1, 2]))
-        # self.accept(numpy.array([[1, 2], [3, 4]]))
+        self.accept_ndarray_i32_1(np_array([1, 2]))
+        self.accept_ndarray_i32_2(np_array([[1, 2], [3, 4]]))
         # self.accept(self)
 
     # @kernel
@@ -563,45 +578,44 @@ class ListTupleTest(ExperimentCase):
         self.create(_EmptyList).run()
 
 
-#@nac3
-#class _ArrayQuoting(EnvExperiment):
-#    vec_i32: KernelInvariant[ndarray[int32, 1]]
-#    mat_i64: KernelInvariant[ndarray[int64, 2]]
-#    arr_f64: KernelInvariant[ndarray[float, 3]]
-#    strs: KernelInvariant[ndarray[str, 1]]
-#
-#    def build(self):
-#        self.setattr_device("core")
-#        self.vec_i32 = numpy.array([0, 1], dtype=int32)
-#        self.mat_i64 = numpy.array([[0, 1], [2, 3]], dtype=int64)
-#        self.arr_f64 = numpy.array([[[0.0, 1.0], [2.0, 3.0]],
-#                                    [[4.0, 5.0], [6.0, 7.0]]])
-#        self.strs = numpy.array(["foo", "bar"])
-#
-#    @kernel
-#    def run(self):
-#        assert self.vec_i32[0] == 0
-#        assert self.vec_i32[1] == 1
-#
-#        assert self.mat_i64[0, 0] == 0
-#        assert self.mat_i64[0, 1] == 1
-#        assert self.mat_i64[1, 0] == 2
-#        assert self.mat_i64[1, 1] == 3
-#
-#        assert self.arr_f64[0, 0, 0] == 0.0
-#        assert self.arr_f64[0, 0, 1] == 1.0
-#        assert self.arr_f64[0, 1, 0] == 2.0
-#        assert self.arr_f64[0, 1, 1] == 3.0
-#        assert self.arr_f64[1, 0, 0] == 4.0
-#        assert self.arr_f64[1, 0, 1] == 5.0
-#        assert self.arr_f64[1, 1, 0] == 6.0
-#        assert self.arr_f64[1, 1, 1] == 7.0
-#
-#        assert self.strs[0] == "foo"
-#        assert self.strs[1] == "bar"
+@nac3
+class _ArrayQuoting(EnvExperiment):
+    vec_i32: KernelInvariant[ndarray[int32, 1]]
+    mat_i64: KernelInvariant[ndarray[int64, 2]]
+    arr_f64: KernelInvariant[ndarray[float, 3]]
+    strs: KernelInvariant[ndarray[str, 1]]
+
+    def build(self):
+        self.setattr_device("core")
+        self.vec_i32 = int32(np_array([0, 1]))
+        self.mat_i64 = int64(np_array([[0, 1], [2, 3]]))
+        self.arr_f64 = np_array([[[0.0, 1.0], [2.0, 3.0]],
+                                [[4.0, 5.0], [6.0, 7.0]]])
+        self.strs = np_array(["foo", "bar"])
+
+    @kernel
+    def run(self):
+        assert self.vec_i32[0] == 0
+        assert self.vec_i32[1] == 1
+
+        # assert self.mat_i64[0, 0] == int64(0)
+        # assert self.mat_i64[0, 1] == int64(1)
+        # assert self.mat_i64[1, 0] == int64(2)
+        # assert self.mat_i64[1, 1] == int64(3)
+
+        # assert self.arr_f64[0, 0, 0] == 0.0
+        # assert self.arr_f64[0, 0, 1] == 1.0
+        # assert self.arr_f64[0, 1, 0] == 2.0
+        # assert self.arr_f64[0, 1, 1] == 3.0
+        # assert self.arr_f64[1, 0, 0] == 4.0
+        # assert self.arr_f64[1, 0, 1] == 5.0
+        # assert self.arr_f64[1, 1, 0] == 6.0
+        # assert self.arr_f64[1, 1, 1] == 7.0
+
+        # assert self.strs[0] == "foo"
+        # assert self.strs[1] == "bar"
 
 
-@unittest.skip("nac3 ndarray")
 class ArrayQuotingTest(ExperimentCase):
     def test_quoting(self):
         self.create(_ArrayQuoting).run()
@@ -704,18 +718,16 @@ class AlignmentTest(ExperimentCase):
         self.create(_Alignment).run()
 
 
-#@nac3
-#class _NumpyQuoting(EnvExperiment):
-#    def build(self):
-#        self.setattr_device("core")
-#
-#    @kernel
-#    def run(self):
-#        a = numpy.array([10, 20])
-#        b = numpy.sqrt(4.0)
+@nac3
+class _NumpyQuoting(EnvExperiment):
+    def build(self):
+        self.setattr_device("core")
 
+    @kernel
+    def run(self):
+        a = np_array([10, 20])
+        b = np_sqrt(4.0)
 
-@unittest.skip("nac3 numpy module")
 class NumpyQuotingTest(ExperimentCase):
     def test_issue_1871(self):
         """Ensure numpy.array() does not break NumPy math functions"""
