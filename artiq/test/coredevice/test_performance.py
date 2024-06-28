@@ -80,14 +80,9 @@ class _Transfer(EnvExperiment):
         else:
             return array_small
 
-    @rpc
-    def get_string_list(self) -> list[str]:
-        return string_list
-
-    # NAC3TODO: bytes
     # @rpc
-    # def sink(self, data):
-    #     pass
+    # def get_string_list(self) -> list[str]:
+    #     return string_list
 
     @rpc
     def sink_byte_list(self, data: list[bool]):
@@ -102,15 +97,14 @@ class _Transfer(EnvExperiment):
     def sink_array(self, data: ndarray[int32, 1]):
         pass
 
-    # NAC3TODO: bytes
-    # @rpc(flags={"async"})
-    # def sink_async(self, data):
-    #     global received_bytes, time_start, time_end
-    #     if received_bytes == 0:
-    #         time_start = time.time()
-    #     received_bytes += len(data)
-    #     if received_bytes == (1024 ** 2)*128:
-    #         time_end = time.time()
+    @rpc(flags={"async"})
+    def sink_async(self, data: list[bool]):
+        global received_bytes, time_start, time_end
+        if received_bytes == 0:
+            time_start = time.time()
+        received_bytes += len(data)
+        if received_bytes == (1024 ** 2)*128:
+            time_end = time.time()
 
     @rpc
     def get_async_throughput(self) -> float:
