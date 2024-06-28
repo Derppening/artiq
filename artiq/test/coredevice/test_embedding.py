@@ -365,16 +365,16 @@ class _RPCCalls(EnvExperiment):
     def builtin(self):
         sleep_rpc(1.0)
 
-    @rpc # NAC3TODO (flags={"async"})
-    def async_rpc(self):
-        pass
+    # @rpc(flags={"async"})
+    # def async_rpc(self):
+    #     pass
 
-    @kernel
-    def async_in_try(self):
-        try:
-            self.async_rpc()
-        except ValueError:
-            pass
+    # @kernel
+    # def async_in_try(self):
+    #     try:
+    #         self.async_rpc()
+    #     except ValueError:
+    #         pass
 
 
 class RPCCallsTest(ExperimentCase):
@@ -394,7 +394,7 @@ class RPCCallsTest(ExperimentCase):
 #        self.assertEqual(list_int64, [int64(1)])
         self.assertTrue(isinstance(list_int64[0], int64))
         exp.builtin()
-#        exp.async_in_try()
+        # exp.async_in_try()
 
 
 @nac3
