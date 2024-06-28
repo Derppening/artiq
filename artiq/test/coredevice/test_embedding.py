@@ -319,7 +319,7 @@ class _RPCCalls(EnvExperiment):
     def args(self, *args) -> int32:
         return len(args)
 
-    # NAC3TODO: Unsupported str-default argument, unsupported varargs
+    # NAC3TODO: Unsupported varargs
 #    @rpc
 #    def kwargs(self, x: str = "", **kwargs) -> int32:
 #        return len(kwargs)
@@ -358,39 +358,7 @@ class _RPCCalls(EnvExperiment):
 #        return self._list_int64
 
     @kernel
-    def args0(self):
-        return self.args()
-
-    @kernel
-    def args1(self):
-        return self.args("A")
-
-    @kernel
-    def args2(self):
-        return self.args("A", 1)
-
-    @kernel
-    def kwargs0(self):
-        return self.kwargs()
-
-    @kernel
-    def kwargs1(self):
-        return self.kwargs(a="A")
-
-    @kernel
-    def kwargs2(self):
-        return self.kwargs(a="A", b=1)
-
-    @kernel
-    def args1kwargs2(self):
-        return self.kwargs("X", a="A", b=1)
-
-    @kernel
-    def list_int64(self):
-        return self._list_int64
-
-    @kernel
-    def numpy_things(self):
+    def numpy_things(self) -> tuple[int32, int64]:
         return (int32(10), int64(20))
 
     @kernel
