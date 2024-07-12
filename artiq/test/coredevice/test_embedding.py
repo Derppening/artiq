@@ -283,7 +283,7 @@ class RPCTypesTest(ExperimentCase):
 
     def test_recv(self):
         exp = self.create(_RPCTypes)
-        exp.run_send()
+        exp.run_recv()
 
     # NAC3TODO
     @unittest.skip("nac3 bytes")
