@@ -297,7 +297,7 @@ class RPCTypesTest(ExperimentCase):
 
     def test_recv(self):
         exp = self.create(_RPCTypes)
-        exp.run_send()
+        exp.run_recv()
 
     @unittest.skip("nac3 bytes")
     def test_mismatch(self):
