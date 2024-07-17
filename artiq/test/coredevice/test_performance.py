@@ -2,10 +2,11 @@ import os
 import time
 import unittest
 import numpy
-from numpy import int32, float64, ndarray
+from numpy import int32, float64
 
 from artiq.coredevice.core import Core
 from artiq.experiment import *
+from artiq.language.numpy_preamble import ndarray, np_array
 from artiq.test.hardware_testbench import ExperimentCase
 
 # large: 1MB payload
@@ -16,8 +17,8 @@ bytes_small = b"\x00" * (1 << 10)
 list_large = [123] * (1 << 18)
 list_small = [123] * (1 << 8)
 
-array_large = numpy.array(list_large, int32)
-array_small = numpy.array(list_small, int32)
+array_large = np_array(list_large, int32)
+array_small = np_array(list_small, int32)
 
 byte_list_large = [True] * (1 << 20)
 byte_list_small = [True] * (1 << 10)
@@ -193,8 +194,8 @@ class TransferTest(ExperimentCase):
     def test_bytes_large(self):
         exp = self.create(_Transfer)
         results = exp.test_bytes(True)
-        host_to_device = (1 << 20) / numpy.array(results[0], float64)
-        device_to_host = (1 << 20) / numpy.array(results[1], float64)
+        host_to_device = (1 << 20) / np_array(results[0])
+        device_to_host = (1 << 20) / np_array(results[1])
         host_to_device /= 1024*1024
         device_to_host /= 1024*1024
         self.results.append(["Bytes (1MB) H2D", host_to_device.mean(),
@@ -206,8 +207,8 @@ class TransferTest(ExperimentCase):
     def test_bytes_small(self):
         exp = self.create(_Transfer)
         results = exp.test_bytes(False)
-        host_to_device = (1 << 10) / numpy.array(results[0], float64)
-        device_to_host = (1 << 10) / numpy.array(results[1], float64)
+        host_to_device = (1 << 10) / np_array(results[0])
+        device_to_host = (1 << 10) / np_array(results[1])
         host_to_device /= 1024*1024
         device_to_host /= 1024*1024
         self.results.append(["Bytes (1KB) H2D", host_to_device.mean(),
@@ -218,8 +219,8 @@ class TransferTest(ExperimentCase):
     def test_byte_list_large(self):
         exp = self.create(_Transfer)
         results = exp.test_byte_list(True)
-        host_to_device = (1 << 20) / numpy.array(results[0], float64)
-        device_to_host = (1 << 20) / numpy.array(results[1], float64)
+        host_to_device = (1 << 20) / np_array(results[0])
+        device_to_host = (1 << 20) / np_array(results[1])
         host_to_device /= 1024*1024
         device_to_host /= 1024*1024
         self.results.append(["Bytes List (1MB) H2D", host_to_device.mean(),
@@ -230,8 +231,8 @@ class TransferTest(ExperimentCase):
     def test_byte_list_small(self):
         exp = self.create(_Transfer)
         results = exp.test_byte_list(False)
-        host_to_device = (1 << 10) / numpy.array(results[0], float64)
-        device_to_host = (1 << 10) / numpy.array(results[1], float64)
+        host_to_device = (1 << 10) / np_array(results[0])
+        device_to_host = (1 << 10) / np_array(results[1])
         host_to_device /= 1024*1024
         device_to_host /= 1024*1024
         self.results.append(["Bytes List (1KB) H2D", host_to_device.mean(),
@@ -242,8 +243,8 @@ class TransferTest(ExperimentCase):
     def test_list_large(self):
         exp = self.create(_Transfer)
         results = exp.test_list(True)
-        host_to_device = (1 << 20) / numpy.array(results[0], float64)
-        device_to_host = (1 << 20) / numpy.array(results[1], float64)
+        host_to_device = (1 << 20) / np_array(results[0])
+        device_to_host = (1 << 20) / np_array(results[1])
         host_to_device /= 1024*1024
         device_to_host /= 1024*1024
         self.results.append(["I32 List (1MB) H2D", host_to_device.mean(),
@@ -254,8 +255,8 @@ class TransferTest(ExperimentCase):
     def test_list_small(self):
         exp = self.create(_Transfer)
         results = exp.test_list(False)
-        host_to_device = (1 << 10) / numpy.array(results[0], float64)
-        device_to_host = (1 << 10) / numpy.array(results[1], float64)
+        host_to_device = (1 << 10) / np_array(results[0], float64)
+        device_to_host = (1 << 10) / np_array(results[1], float64)
         host_to_device /= 1024*1024
         device_to_host /= 1024*1024
         self.results.append(["I32 List (1KB) H2D", host_to_device.mean(),
@@ -266,8 +267,8 @@ class TransferTest(ExperimentCase):
     def test_array_large(self):
         exp = self.create(_Transfer)
         results = exp.test_array(True)
-        host_to_device = (1 << 20) / numpy.array(results[0], float64)
-        device_to_host = (1 << 20) / numpy.array(results[1], float64)
+        host_to_device = (1 << 20) / np_array(results[0], float64)
+        device_to_host = (1 << 20) / np_array(results[1], float64)
         host_to_device /= 1024*1024
         device_to_host /= 1024*1024
         self.results.append(["I32 Array (1MB) H2D", host_to_device.mean(),
@@ -278,8 +279,8 @@ class TransferTest(ExperimentCase):
     def test_array_small(self):
         exp = self.create(_Transfer)
         results = exp.test_array(False)
-        host_to_device = (1 << 10) / numpy.array(results[0], float64)
-        device_to_host = (1 << 10) / numpy.array(results[1], float64)
+        host_to_device = (1 << 10) / np_array(results[0], float64)
+        device_to_host = (1 << 10) / np_array(results[1], float64)
         host_to_device /= 1024*1024
         device_to_host /= 1024*1024
         self.results.append(["I32 Array (1KB) H2D", host_to_device.mean(),

@@ -1,16 +1,18 @@
 import numpy
-from numpy import int32, int64, ndarray
+from numpy import int32, int64
 import unittest
-from time import sleep
 from typing import Self
 
-from artiq.language.core import *
-from artiq.experiment import *
-from artiq.test.hardware_testbench import ExperimentCase
+from artiq.coredevice.core import Core
 from artiq.coredevice.comm_kernel import RPCReturnValueError
+from artiq.experiment import *
+from artiq.language.numpy_preamble import np_array, np_sqrt, int64, ndarray
+from artiq.test.hardware_testbench import ExperimentCase
 
 
 class _Roundtrip(EnvExperiment):
+    core: KernelInvariant[Core]
+
     def build(self):
         self.setattr_device("core")
 
@@ -267,8 +269,8 @@ class _RPCTypes(EnvExperiment):
         self.accept_tuple((2, 3))
         self.accept_list([1, 2])
         self.accept_range(range(10))
-        self.accept_ndarray_1(numpy.array([1, 2]))
-        self.accept_ndarray_2(numpy.array([[1, 2], [3, 4]]))
+        self.accept_ndarray_1(np_array([1, 2]))
+        self.accept_ndarray_2(np_array([[1, 2], [3, 4]]))
         self.accept_self_obj(self)
 
     @kernel
@@ -536,21 +538,21 @@ class _ArrayQuoting(EnvExperiment):
 
     def build(self):
         self.setattr_device("core")
-        self.vec_i32 = numpy.array([0, 1], dtype=int32)
-        self.mat_i64 = numpy.array([[0, 1], [2, 3]], dtype=int64)
-        self.arr_f64 = numpy.array([[[0.0, 1.0], [2.0, 3.0]],
-                                    [[4.0, 5.0], [6.0, 7.0]]])
-        self.strs = numpy.array(["foo", "bar"])
+        self.vec_i32 = int32(np_array([0, 1]))
+        self.mat_i64 = int64(np_array([[0, 1], [2, 3]]))
+        self.arr_f64 = np_array([[[0.0, 1.0], [2.0, 3.0]],
+                                 [[4.0, 5.0], [6.0, 7.0]]])
+        self.strs = np_array(["foo", "bar"])
 
     @kernel
     def run(self):
         assert self.vec_i32[0] == 0
         assert self.vec_i32[1] == 1
 
-        assert self.mat_i64[0, 0] == 0
-        assert self.mat_i64[0, 1] == 1
-        assert self.mat_i64[1, 0] == 2
-        assert self.mat_i64[1, 1] == 3
+        assert self.mat_i64[0, 0] == int64(0)
+        assert self.mat_i64[0, 1] == int64(1)
+        assert self.mat_i64[1, 0] == int64(2)
+        assert self.mat_i64[1, 1] == int64(3)
 
         assert self.arr_f64[0, 0, 0] == 0.0
         assert self.arr_f64[0, 0, 1] == 1.0

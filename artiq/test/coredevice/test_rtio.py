@@ -435,6 +435,7 @@ class Collision(EnvExperiment):
             pass
 
 
+@nac3
 class AddressCollision(EnvExperiment):
     core: KernelInvariant[Core]
     loop_in: KernelInvariant[TTLInOut]
@@ -447,7 +448,7 @@ class AddressCollision(EnvExperiment):
     def run(self):
         self.core.reset()
         self.loop_in.input()
-        self.loop_in.pulse(10*us)
+        self.loop_in.pulse(10.*us)
         while self.core.get_rtio_counter_mu() < now_mu():
             pass
 
