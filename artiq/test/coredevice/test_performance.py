@@ -2,8 +2,9 @@ import os
 import time
 import unittest
 import numpy
-from numpy import int32, float64
+from numpy import int32, float64, ndarray
 
+from artiq.coredevice.core import Core
 from artiq.experiment import *
 from artiq.test.hardware_testbench import ExperimentCase
 
@@ -25,7 +26,13 @@ received_bytes = 0
 time_start = 0
 time_end = 0
 
+@nac3
 class _Transfer(EnvExperiment):
+    core: KernelInvariant[Core]
+    count: KernelInvariant[int32]
+    h2d: Kernel[list[float]]
+    d2h: Kernel[list[float]]
+
     def build(self):
         self.setattr_device("core")
         self.count = 10
@@ -54,7 +61,7 @@ class _Transfer(EnvExperiment):
             return byte_list_small
 
     @rpc
-    def get_array(self, large: bool) -> numpy.ndarray: # NAC3TODO: [int32]
+    def get_array(self, large: bool) -> ndarray[int32, 1]:
         if large:
             return array_large
         else:
@@ -65,11 +72,23 @@ class _Transfer(EnvExperiment):
         return string_list
 
     @rpc
-    def sink(self, data):
+    def sink_bytes(self, data: bytes):
+        pass
+
+    @rpc
+    def sink_byte_list(self, data: list[bool]):
+        pass
+
+    @rpc
+    def sink_int_list(self, data: list[int32]):
+        pass
+
+    @rpc
+    def sink_array(self, data: ndarray[int32, 1]):
         pass
 
     @rpc(flags={"async"})
-    def sink_async(self, data):
+    def sink_async(self, data: bytes):
         global received_bytes, time_start, time_end
         if received_bytes == 0:
             time_start = time.time()
@@ -82,12 +101,12 @@ class _Transfer(EnvExperiment):
         return 128.0 / (time_end - time_start)
 
     @kernel
-    def test_bytes(self, large):
+    def test_bytes(self, large: bool):
         def inner():
             t0 = self.core.get_rtio_counter_mu()
             data = self.get_bytes(large)
             t1 = self.core.get_rtio_counter_mu()
-            self.sink(data)
+            self.sink_bytes(data)
             t2 = self.core.get_rtio_counter_mu()
             self.h2d[i] = self.core.mu_to_seconds(t1 - t0)
             self.d2h[i] = self.core.mu_to_seconds(t2 - t1)
@@ -97,12 +116,12 @@ class _Transfer(EnvExperiment):
         return (self.h2d, self.d2h)
 
     @kernel
-    def test_byte_list(self, large):
+    def test_byte_list(self, large: bool):
         def inner():
             t0 = self.core.get_rtio_counter_mu()
             data = self.get_byte_list(large)
             t1 = self.core.get_rtio_counter_mu()
-            self.sink(data)
+            self.sink_byte_list(data)
             t2 = self.core.get_rtio_counter_mu()
             self.h2d[i] = self.core.mu_to_seconds(t1 - t0)
             self.d2h[i] = self.core.mu_to_seconds(t2 - t1)
@@ -112,12 +131,12 @@ class _Transfer(EnvExperiment):
         return (self.h2d, self.d2h)
 
     @kernel
-    def test_list(self, large):
+    def test_list(self, large: bool):
         def inner():
             t0 = self.core.get_rtio_counter_mu()
             data = self.get_list(large)
             t1 = self.core.get_rtio_counter_mu()
-            self.sink(data)
+            self.sink_int_list(data)
             t2 = self.core.get_rtio_counter_mu()
             self.h2d[i] = self.core.mu_to_seconds(t1 - t0)
             self.d2h[i] = self.core.mu_to_seconds(t2 - t1)
@@ -127,12 +146,12 @@ class _Transfer(EnvExperiment):
         return (self.h2d, self.d2h)
 
     @kernel
-    def test_array(self, large):
+    def test_array(self, large: bool):
         def inner():
             t0 = self.core.get_rtio_counter_mu()
             data = self.get_array(large)
             t1 = self.core.get_rtio_counter_mu()
-            self.sink(data)
+            self.sink_array(data)
             t2 = self.core.get_rtio_counter_mu()
             self.h2d[i] = self.core.mu_to_seconds(t1 - t0)
             self.d2h[i] = self.core.mu_to_seconds(t2 - t1)
@@ -141,6 +160,7 @@ class _Transfer(EnvExperiment):
             inner()
         return (self.h2d, self.d2h)
 
+    # NAC3TODO: bytes
     @kernel
     def test_async(self):
         data = self.get_bytes(True)
@@ -169,6 +189,7 @@ class TransferTest(ExperimentCase):
             print("| {} | {:>12.2f} | {:>12.2f} |".format(
                 pad(v[0]), v[1], v[2]))
 
+    @unittest.skip("nac3 bytes")
     def test_bytes_large(self):
         exp = self.create(_Transfer)
         results = exp.test_bytes(True)
@@ -181,6 +202,7 @@ class TransferTest(ExperimentCase):
         self.results.append(["Bytes (1MB) D2H", device_to_host.mean(),
                              device_to_host.std()])
 
+    @unittest.skip("nac3 bytes")
     def test_bytes_small(self):
         exp = self.create(_Transfer)
         results = exp.test_bytes(False)
@@ -265,11 +287,14 @@ class TransferTest(ExperimentCase):
         self.results.append(["I32 Array (1KB) D2H", device_to_host.mean(),
                              device_to_host.std()])
 
+    @unittest.skip("nac3 bytes")
     def test_async_throughput(self):
         exp = self.create(_Transfer)
         results = exp.test_async()
         print("Async throughput: {:>6.2f}MiB/s".format(results))
 
+
+@nac3
 class _KernelOverhead(EnvExperiment):
     def build(self):
         self.setattr_device("core")

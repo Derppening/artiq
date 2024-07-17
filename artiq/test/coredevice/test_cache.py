@@ -32,7 +32,6 @@ class _Cache(EnvExperiment):
         self.put(key, value)
 
 
-@unittest.skip("NAC3TODO https://git.m-labs.hk/M-Labs/nac3/issues/299")
 class CacheTest(ExperimentCase):
     def test_get_empty(self):
         exp = self.create(_Cache)

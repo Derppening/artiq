@@ -2,11 +2,12 @@
 Core ARTIQ extensions to the Python language.
 """
 
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 from functools import wraps
 from inspect import getfullargspec, getmodule
 from types import SimpleNamespace
 from math import floor, ceil
+from time import sleep
 
 from artiq.language import import_cache
 
@@ -15,12 +16,14 @@ __all__ = [
     "Kernel", "KernelInvariant", "virtual", "ConstGeneric",
     "round64", "floor64", "ceil64",
     "extern", "kernel", "portable", "nac3", "rpc",
-    "print_rpc",
+    "print_rpc", "sleep_rpc",
     "Option", "Some", "none", "UnwrapNoneError",
     "set_time_manager",
     "parallel", "legacy_parallel", "sequential",
     "delay_mu", "now_mu", "at_mu",
     "set_watchdog_factory", "watchdog", "TerminationRequested",
+    # TODO(Derppening): Remove from list when core_log and rtio_log implemented
+    "core_log", "rtio_log",
 ]
 
 
@@ -117,6 +120,11 @@ def rpc(arg=None, flags={}):
 @rpc
 def print_rpc(a: T):
     print(a)
+
+
+@rpc
+def sleep_rpc(dur: float):
+    sleep(dur)
 
 
 @nac3
@@ -267,3 +275,15 @@ def watchdog(timeout):
 class TerminationRequested(Exception):
     """Raised by ``pause`` when the user has requested termination."""
     pass
+
+
+# NAC3TODO https://git.m-labs.hk/M-Labs/nac3/issues/297
+@extern
+def core_log(*args: Any):
+    ...
+
+
+# NAC3TODO https://git.m-labs.hk/M-Labs/nac3/issues/297
+@extern
+def rtio_log(*args: Any):
+    ...

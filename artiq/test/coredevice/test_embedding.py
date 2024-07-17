@@ -1,8 +1,10 @@
 import numpy
-from numpy import int32, int64
+from numpy import int32, int64, ndarray
 import unittest
 from time import sleep
+from typing import Self
 
+from artiq.language.core import *
 from artiq.experiment import *
 from artiq.test.hardware_testbench import ExperimentCase
 from artiq.coredevice.comm_kernel import RPCReturnValueError
@@ -17,6 +19,7 @@ class _Roundtrip(EnvExperiment):
         fn(obj)
 
 
+@unittest.skip("fn datatype in nac3")
 class RoundtripTest(ExperimentCase):
     def assertRoundtrip(self, obj):
         exp = self.create(_Roundtrip)
@@ -106,15 +109,17 @@ class RoundtripTest(ExperimentCase):
         self.assertArrayRoundtrip(numpy.array([[1, 2], [3]], dtype=object))
 
 
+@nac3
 class _DefaultArg(EnvExperiment):
     def build(self):
         self.setattr_device("core")
 
-    def test(self, foo=42) -> int32:
+    @rpc
+    def test(self, foo: int32 = 42) -> int32:
         return foo
 
     @kernel
-    def run(self):
+    def run(self) -> int32:
         return self.test()
 
 
@@ -124,47 +129,61 @@ class DefaultArgTest(ExperimentCase):
         self.assertEqual(exp.run(), 42)
 
 
+@nac3
 class _RPCTypes(EnvExperiment):
     def build(self):
         self.setattr_device("core")
 
+    @rpc
     def return_bool(self) -> bool:
         return True
 
+    @rpc
     def return_int32(self) -> int32:
         return 1
 
+    @rpc
     def return_int64(self) -> int64:
         return 0x100000000
 
+    @rpc
     def return_float(self) -> float:
         return 1.0
 
+    @rpc
     def return_str(self) -> str:
         return "foo"
 
+    @rpc
     def return_bytes(self) -> bytes:
         return b"foo"
 
+    @rpc
     def return_bytearray(self) -> bytearray:
         return bytearray(b"foo")
 
+    @rpc
     def return_tuple(self) -> tuple[int32, int32]:
         return (1, 2)
 
+    @rpc
     def return_list(self) -> list[int32]:
         return [2, 3]
 
+    @rpc
     def return_range(self) -> range:
         return range(10)
 
-    def return_array(self) -> numpy.ndarray: # NAC3TODO [int32]
+    @rpc
+    def return_array(self) -> ndarray[int32, 1]:
         return numpy.array([1, 2])
 
-    def return_matrix(self) -> numpy.ndarray: # NAC3TODO [int32, 2]
+    @rpc
+    def return_matrix(self) -> ndarray[int32, 2]:
         return numpy.array([[1, 2], [3, 4]])
 
-    def return_mismatch(self):
+    @rpc
+    def return_mismatch(self) -> bytes:
         return b"foo"
 
     @kernel
@@ -174,34 +193,83 @@ class _RPCTypes(EnvExperiment):
         core_log(self.return_int64())
         core_log(self.return_float())
         core_log(self.return_str())
-        core_log(self.return_bytes())
-        core_log(self.return_bytearray())
+        # core_log(self.return_bytes())
+        # core_log(self.return_bytearray())
         core_log(self.return_tuple())
         core_log(self.return_list())
         core_log(self.return_range())
         core_log(self.return_array())
         core_log(self.return_matrix())
 
-    def accept(self, value):
+    @rpc
+    def accept_bool(self, value: bool):
+        pass
+
+    @rpc
+    def accept_int32(self, value: int32):
+        pass
+
+    @rpc
+    def accept_int64(self, value: int64):
+        pass
+
+    @rpc
+    def accept_float(self, value: float):
+        pass
+
+    @rpc
+    def accept_str(self, value: str):
+        pass
+
+    @rpc
+    def accept_bytes(self, value: bytes):
+        pass
+
+    @rpc
+    def accept_bytearray(self, value: bytearray):
+        pass
+
+    @rpc
+    def accept_tuple(self, value: tuple[int32, int32]):
+        pass
+
+    @rpc
+    def accept_list(self, value: list[int32]):
+        pass
+
+    @rpc
+    def accept_range(self, value: range):
+        pass
+
+    @rpc
+    def accept_ndarray_1(self, value: ndarray[int32, 1]):
+        pass
+
+    @rpc
+    def accept_ndarray_2(self, value: ndarray[int32, 2]):
+        pass
+
+    @rpc
+    def accept_self_obj(self, obj: Self):
         pass
 
     @kernel
     def run_send(self):
-        self.accept(True)
-        self.accept(1)
-        self.accept(0x100000000)
-        self.accept(1.0)
-        self.accept("foo")
-        self.accept(b"foo")
-        self.accept(bytearray(b"foo"))
-        self.accept(bytes([1, 2]))
-        self.accept(bytearray([1, 2]))
-        self.accept((2, 3))
-        self.accept([1, 2])
-        self.accept(range(10))
-        self.accept(numpy.array([1, 2]))
-        self.accept(numpy.array([[1, 2], [3, 4]]))
-        self.accept(self)
+        self.accept_bool(True)
+        self.accept_int32(1)
+        self.accept_int64(int64(0x100000000))
+        self.accept_float(1.0)
+        self.accept_str("foo")
+        # self.accept_bytes(b"foo")
+        # self.accept_bytearray(bytearray(b"foo"))
+        # self.accept_bytes(bytes([1, 2]))
+        # self.accept_bytearray(bytearray([1, 2]))
+        self.accept_tuple((2, 3))
+        self.accept_list([1, 2])
+        self.accept_range(range(10))
+        self.accept_ndarray_1(numpy.array([1, 2]))
+        self.accept_ndarray_2(numpy.array([[1, 2], [3, 4]]))
+        self.accept_self_obj(self)
 
     @kernel
     def run_mismatch(self):
@@ -217,21 +285,30 @@ class RPCTypesTest(ExperimentCase):
         exp = self.create(_RPCTypes)
         exp.run_send()
 
+    # NAC3TODO
+    @unittest.skip("nac3 bytes")
     def test_mismatch(self):
         exp = self.create(_RPCTypes)
         with self.assertRaises(RPCReturnValueError):
             exp.run_mismatch()
 
 
+@nac3
 class _RPCCalls(EnvExperiment):
+    _list_int64: KernelInvariant[list[int64]]
+
     def build(self):
         self.setattr_device("core")
         self._list_int64 = [int64(1)]
 
+    # NAC3TODO: Unsupported varargs
+    @rpc
     def args(self, *args) -> int32:
         return len(args)
 
-    def kwargs(self, x="", **kwargs) -> int32:
+    # NAC3TODO: Unsupported varargs
+    #    @rpc
+    def kwargs(self, x: str = "", **kwargs) -> int32:
         return len(kwargs)
 
     @kernel
@@ -272,7 +349,7 @@ class _RPCCalls(EnvExperiment):
 
     @kernel
     def builtin(self):
-        sleep(1.0)
+        sleep_rpc(1.0)
 
     @rpc(flags={"async"})
     def async_rpc(self):
@@ -289,13 +366,14 @@ class _RPCCalls(EnvExperiment):
 class RPCCallsTest(ExperimentCase):
     def test_args(self):
         exp = self.create(_RPCCalls)
-        self.assertEqual(exp.args0(), 0)
-        self.assertEqual(exp.args1(), 1)
-        self.assertEqual(exp.args2(), 2)
-        self.assertEqual(exp.kwargs0(), 0)
-        self.assertEqual(exp.kwargs1(), 1)
-        self.assertEqual(exp.kwargs2(), 2)
-        self.assertEqual(exp.args1kwargs2(), 2)
+        # NAC3TODO: Varargs
+        # self.assertEqual(exp.args0(), 0)
+        # self.assertEqual(exp.args1(), 1)
+        # self.assertEqual(exp.args2(), 2)
+        # self.assertEqual(exp.kwargs0(), 0)
+        # self.assertEqual(exp.kwargs1(), 1)
+        # self.assertEqual(exp.kwargs2(), 2)
+        # self.assertEqual(exp.args1kwargs2(), 2)
         self.assertEqual(exp.numpy_things(),
                          (int32(10), int64(20)))
         # Ensure lists of int64s don't decay to variable-length builtin integers.
@@ -306,13 +384,14 @@ class RPCCallsTest(ExperimentCase):
         exp.async_in_try()
 
 
+@nac3
 class _Annotation(EnvExperiment):
     def build(self):
         self.setattr_device("core")
 
     @kernel
     def overflow(self, x: int64) -> bool:
-        return (x << 32) != 0
+        return (x << 32) != int64(0)
 
     @kernel
     def monomorphize(self, x: list[int32]):
@@ -322,7 +401,7 @@ class _Annotation(EnvExperiment):
 class AnnotationTest(ExperimentCase):
     def test_annotation(self):
         exp = self.create(_Annotation)
-        self.assertEqual(exp.overflow(1), True)
+        self.assertEqual(exp.overflow(int64(1)), True)
         exp.monomorphize([])
 
 class _Async(EnvExperiment):
@@ -330,7 +409,7 @@ class _Async(EnvExperiment):
         self.setattr_device("core")
 
     @rpc(flags={"async"})
-    def recv_async(self, data):
+    def recv_async(self, data: list[int32]):
         pass
 
     @kernel
@@ -347,11 +426,13 @@ class AsyncTest(ExperimentCase):
         exp.run()
 
 
+@nac3
 class _Payload1MB(EnvExperiment):
     def build(self):
         self.setattr_device("core")
 
-    def devnull(self, d):
+    @rpc
+    def devnull(self, d: list[int32]):
         pass
 
     @kernel
@@ -360,6 +441,7 @@ class _Payload1MB(EnvExperiment):
         self.devnull(data)
 
 
+@nac3
 class LargePayloadTest(ExperimentCase):
     def test_1MB(self):
         exp = self.create(_Payload1MB)
@@ -384,25 +466,30 @@ class _ListTuple(EnvExperiment):
             self.verify(d)
 
     @kernel
-    def verify(self, data):
+    def verify(self, data: list[int32]):
         for i in range(len(data)):
             if data[i] != data[0] + i:
                 raise ValueError
 
+    @rpc
     def get_num_iters(self) -> int32:
         return 2
 
-    def get_values(self, base_a, base_b, n) -> tuple[list[int32], list[int32]]:
+    @rpc
+    def get_values(self, base_a: int32, base_b: int32, n: int32) -> tuple[list[int32], list[int32]]:
         return [int32(base_a + i) for i in range(n)], \
             [int32(base_b + i) for i in range(n)]
 
 
 class _NestedTupleList(EnvExperiment):
+    data: KernelInvariant[list[tuple[int32, list[tuple[str, list[float], list[int32]]]]]]
+
     def build(self):
         self.setattr_device("core")
         self.data = [(0x12345678, [("foo", [0.0, 1.0], [2, 3])]),
                      (0x76543210, [("bar", [4.0, 5.0], [6, 7])])]
 
+    @rpc
     def get_data(self) -> list[tuple
             [int32, list[tuple[str, list[float], list[int32]]]]]:
         return self.data
@@ -418,6 +505,7 @@ class _EmptyList(EnvExperiment):
     def build(self):
         self.setattr_device("core")
 
+    @rpc
     def get_empty(self) -> list[int32]:
         return []
 
@@ -439,7 +527,13 @@ class ListTupleTest(ExperimentCase):
         self.create(_EmptyList).run()
 
 
+@nac3
 class _ArrayQuoting(EnvExperiment):
+    vec_i32: KernelInvariant[ndarray[int32, 1]]
+    mat_i64: KernelInvariant[ndarray[int64, 2]]
+    arr_f64: KernelInvariant[ndarray[float, 3]]
+    strs: KernelInvariant[ndarray[str, 1]]
+
     def build(self):
         self.setattr_device("core")
         self.vec_i32 = numpy.array([0, 1], dtype=int32)
@@ -476,16 +570,17 @@ class ArrayQuotingTest(ExperimentCase):
         self.create(_ArrayQuoting).run()
 
 
+@nac3
 class _Assert(EnvExperiment):
     def build(self):
         self.setattr_device("core")
 
     @kernel
-    def check(self, value):
+    def check(self, value: bool):
         assert value
 
     @kernel
-    def check_msg(self, value):
+    def check_msg(self, value: bool):
         assert value, "foo"
 
 
@@ -505,6 +600,9 @@ class AssertTest(ExperimentCase):
 
 
 class _NumpyBool(EnvExperiment):
+    np_true: KernelInvariant[bool]
+    np_false: KernelInvariant[bool]
+
     def build(self):
         self.setattr_device("core")
         self.np_true = numpy.True_
@@ -524,7 +622,15 @@ class NumpyBoolTest(ExperimentCase):
         self.create(_NumpyBool).run()
 
 
+@nac3
 class _Alignment(EnvExperiment):
+    a: KernelInvariant[bool]
+    b: KernelInvariant[float]
+    c: KernelInvariant[bool]
+    d: KernelInvariant[bool]
+    e: KernelInvariant[float]
+    f: KernelInvariant[bool]
+
     def build(self):
         self.setattr_device("core")
         self.a = False
@@ -560,14 +666,15 @@ class AlignmentTest(ExperimentCase):
         self.create(_Alignment).run()
 
 
+@nac3
 class _NumpyQuoting(EnvExperiment):
     def build(self):
         self.setattr_device("core")
 
     @kernel
     def run(self):
-        a = numpy.array([10, 20])
-        b = numpy.sqrt(4.0)
+        a = np_array([10, 20])
+        b = np_sqrt(4.0)
 
 
 class NumpyQuotingTest(ExperimentCase):
@@ -577,6 +684,11 @@ class NumpyQuotingTest(ExperimentCase):
 
 
 class _IntBoundary(EnvExperiment):
+    int32_min: KernelInvariant[int32]
+    int32_max: KernelInvariant[int32]
+    int64_min: KernelInvariant[int64]
+    int64_max: KernelInvariant[int64]
+
     def build(self):
         self.setattr_device("core")
         self.int32_min = numpy.iinfo(int32).min

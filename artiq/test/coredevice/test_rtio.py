@@ -3,24 +3,31 @@
 
 import os, unittest
 import numpy as np
+from numpy import int32, int64
 
 from math import sqrt
 
 from artiq.experiment import *
 from artiq.test.hardware_testbench import ExperimentCase
 from artiq.coredevice import exceptions
+from artiq.coredevice.ad9914 import AD9914
 from artiq.coredevice.core import Core
-from artiq.coredevice.ttl import TTLOut
+from artiq.coredevice.dma import CoreDMA
+from artiq.coredevice.ttl import TTLClockGen, TTLInOut, TTLOut
 from artiq.coredevice.comm_mgmt import CommMgmt
 from artiq.coredevice.comm_analyzer import (StoppedMessage, OutputMessage, InputMessage,
                                             decode_dump, get_analyzer_dump)
+from artiq.language.core import *
 
 
 artiq_low_latency = os.getenv("ARTIQ_LOW_LATENCY")
 artiq_in_devel = os.getenv("ARTIQ_IN_DEVEL")
 
 
+@nac3
 class RTIOCounter(EnvExperiment):
+    core: KernelInvariant[Core]
+
     def build(self):
         self.setattr_device("core")
 
@@ -31,28 +38,36 @@ class RTIOCounter(EnvExperiment):
         self.set_dataset("dt", self.core.mu_to_seconds(t1 - t0))
 
 
+@nac3
 class InvalidCounter(Exception):
     pass
 
 
+@nac3
 class WaitForRTIOCounter(EnvExperiment):
+    core: KernelInvariant[Core]
+
     def build(self):
         self.setattr_device("core")
 
     @kernel
     def run(self):
         self.core.break_realtime()
-        target_mu = now_mu() + 10000
+        target_mu = now_mu() + int64(10000)
         self.core.wait_until_mu(target_mu)
         if self.core.get_rtio_counter_mu() < target_mu:
             raise InvalidCounter
 
 
+@nac3
 class PulseNotReceived(Exception):
     pass
 
 
 class RTT(EnvExperiment):
+    core: KernelInvariant[Core]
+    ttl_inout: KernelInvariant[TTLInOut]
+
     def build(self):
         self.setattr_device("core")
         self.setattr_device("ttl_inout")
@@ -76,7 +91,12 @@ class RTT(EnvExperiment):
         self.set_dataset("rtt", self.core.mu_to_seconds(t1 - t0))
 
 
+@nac3
 class Loopback(EnvExperiment):
+    core: KernelInvariant[Core]
+    loop_in: KernelInvariant[TTLInOut]
+    loop_out: KernelInvariant[TTLOut]
+
     def build(self):
         self.setattr_device("core")
         self.setattr_device("loop_in")
@@ -87,20 +107,25 @@ class Loopback(EnvExperiment):
         self.core.reset()
         self.loop_in.input()
         self.loop_out.off()
-        delay(1*us)
+        self.core.delay(1.*us)
         with parallel:
-            self.loop_in.gate_rising(2*us)
+            self.loop_in.gate_rising(2.*us)
             with sequential:
-                delay(1*us)
+                self.core.delay(1.*us)
                 t0 = now_mu()
-                self.loop_out.pulse(1*us)
+                self.loop_out.pulse(1.*us)
         t1 = self.loop_in.timestamp_mu(now_mu())
-        if t1 < 0:
+        if t1 < int64(0):
             raise PulseNotReceived
         self.set_dataset("rtt", self.core.mu_to_seconds(t1 - t0))
 
 
+@nac3
 class ClockGeneratorLoopback(EnvExperiment):
+    core: KernelInvariant[Core]
+    loop_clock_in: KernelInvariant[TTLInOut]
+    loop_clock_out: KernelInvariant[TTLClockGen]
+
     def build(self):
         self.setattr_device("core")
         self.setattr_device("loop_clock_in")
@@ -111,12 +136,12 @@ class ClockGeneratorLoopback(EnvExperiment):
         self.core.reset()
         self.loop_clock_in.input()
         self.loop_clock_out.stop()
-        delay(200*us)
+        self.core.delay(200.*us)
         with parallel:
-            self.loop_clock_in.gate_rising(10*us)
+            self.loop_clock_in.gate_rising(10.*us)
             with sequential:
-                delay(200*ns)
-                self.loop_clock_out.set(1*MHz)
+                self.core.delay(200.*ns)
+                self.loop_clock_out.set(1.*MHz)
         self.set_dataset("count", self.loop_clock_in.count(now_mu()))
 
 
@@ -153,6 +178,10 @@ class PulseRate(EnvExperiment):
 
 
 class PulseRateAD9914DDS(EnvExperiment):
+    core: KernelInvariant[Core]
+    ad9914dds0: KernelInvariant[AD9914]
+    ad9914dds1: KernelInvariant[AD9914]
+
     def build(self):
         self.setattr_device("core")
         self.setattr_device("ad9914dds0")
@@ -181,8 +210,14 @@ class PulseRateAD9914DDS(EnvExperiment):
                 return
 
 
+@nac3
 class LoopbackCount(EnvExperiment):
-    def build(self, npulses):
+    core: KernelInvariant[Core]
+    loop_in: KernelInvariant[TTLInOut]
+    loop_out: KernelInvariant[TTLOut]
+    npulses: KernelInvariant[int32]
+
+    def build(self, npulses: int32):
         self.setattr_device("core")
         self.setattr_device("loop_in")
         self.setattr_device("loop_out")
@@ -196,21 +231,27 @@ class LoopbackCount(EnvExperiment):
         self.core.reset()
         self.loop_in.input()
         self.loop_out.output()
-        delay(5*us)
+        self.core.delay(5.*us)
         with parallel:
-            self.loop_in.gate_rising(10*us)
+            self.loop_in.gate_rising(10.*us)
             with sequential:
                 for i in range(self.npulses):
-                    delay(25*ns)
-                    self.loop_out.pulse(25*ns)
+                    self.core.delay(25.*ns)
+                    self.loop_out.pulse(25.*ns)
         self.set_dataset("count", self.loop_in.count(now_mu()))
 
 
+@nac3
 class IncorrectPulseTiming(Exception):
     pass
 
 
+@nac3
 class LoopbackGateTiming(EnvExperiment):
+    core: KernelInvariant[Core]
+    loop_in: KernelInvariant[TTLInOut]
+    loop_out: KernelInvariant[TTLOut]
+
     def build(self):
         self.setattr_device("core")
         self.setattr_device("loop_in")
@@ -222,19 +263,20 @@ class LoopbackGateTiming(EnvExperiment):
         self.core.reset()
         self.loop_in.input()
         self.loop_out.output()
-        delay_mu(500)
+        delay_mu(int64(500))
         self.loop_out.off()
-        delay_mu(5000)
+        delay_mu(int64(5000))
 
         # Determine loop delay.
+        out_mu = int64(0)
         with parallel:
-            self.loop_in.gate_rising_mu(10000)
+            self.loop_in.gate_rising_mu(int64(10000))
             with sequential:
-                delay_mu(5000)
+                delay_mu(int64(5000))
                 out_mu = now_mu()
-                self.loop_out.pulse_mu(1000)
+                self.loop_out.pulse_mu(int64(1000))
         in_mu = self.loop_in.timestamp_mu(now_mu())
-        if in_mu < 0:
+        if in_mu < int64(0):
             raise PulseNotReceived("Cannot determine loop delay")
         loop_delay_mu = in_mu - out_mu
 
@@ -242,37 +284,43 @@ class LoopbackGateTiming(EnvExperiment):
         # In the most common configuration, 24 mu == 24 ns == 3 coarse periods,
         # which should be plenty of slack.
         # FIXME: ZC706 with NIST_QC2 needs 48ns - hw problem?
-        delay_mu(10000)
+        delay_mu(int64(10000))
 
         gate_start_mu = now_mu()
-        self.loop_in.gate_both_mu(48) # XXX
+        self.loop_in.gate_both_mu(int64(48)) # XXX
         gate_end_mu = now_mu()
 
         # gateware latency offset between gate and input
-        lat_offset = 11*8
+        lat_offset = int64(11*8)
         out_mu = gate_start_mu - loop_delay_mu + lat_offset
         at_mu(out_mu)
-        self.loop_out.pulse_mu(48) # XXX
+        self.loop_out.pulse_mu(int64(48)) # XXX
 
         in_mu = self.loop_in.timestamp_mu(gate_end_mu)
-        print("timings: ", gate_start_mu, in_mu - lat_offset, gate_end_mu)
-        if in_mu < 0:
+        print_rpc(("timings: ", gate_start_mu, in_mu - lat_offset, gate_end_mu))
+        if in_mu < int64(0):
             raise PulseNotReceived
         if not (gate_start_mu <= (in_mu - lat_offset) <= gate_end_mu):
             raise IncorrectPulseTiming("Input event should occur during gate")
-        if not (-2 < (in_mu - out_mu - loop_delay_mu) < 2):
+        if not (int64(-2) < (in_mu - out_mu - loop_delay_mu) < int64(2)):
             raise IncorrectPulseTiming("Loop delay should not change")
 
         in_mu = self.loop_in.timestamp_mu(gate_end_mu)
-        if in_mu > 0:
+        if in_mu > int64(0):
             raise IncorrectPulseTiming("Only one pulse should be received")
 
 
+@nac3
 class IncorrectLevel(Exception):
     pass
 
 
+@nac3
 class Level(EnvExperiment):
+    core: KernelInvariant[Core]
+    loop_in: KernelInvariant[TTLInOut]
+    loop_out: KernelInvariant[TTLOut]
+
     def build(self):
         self.setattr_device("core")
         self.setattr_device("loop_in")
@@ -283,20 +331,25 @@ class Level(EnvExperiment):
         self.core.reset()
         self.loop_in.input()
         self.loop_out.output()
-        delay(5*us)
+        self.core.delay(5.*us)
 
         self.loop_out.off()
-        delay(5*us)
-        if self.loop_in.sample_get_nonrt():
+        self.core.delay(5.*us)
+        if bool(self.loop_in.sample_get_nonrt()):
             raise IncorrectLevel
 
         self.loop_out.on()
-        delay(5*us)
+        self.core.delay(5.*us)
         if not self.loop_in.sample_get_nonrt():
             raise IncorrectLevel
 
 
+@nac3
 class Watch(EnvExperiment):
+    core: KernelInvariant[Core]
+    loop_in: KernelInvariant[TTLInOut]
+    loop_out: KernelInvariant[TTLOut]
+
     def build(self):
         self.setattr_device("core")
         self.setattr_device("loop_in")
@@ -307,27 +360,31 @@ class Watch(EnvExperiment):
         self.core.reset()
         self.loop_in.input()
         self.loop_out.output()
-        delay(5*us)
+        self.core.delay(5.*us)
 
         self.loop_out.off()
-        delay(5*us)
+        self.core.delay(5.*us)
         if not self.loop_in.watch_stay_off():
             raise IncorrectLevel
-        delay(10*us)
+        self.core.delay(10.*us)
         if not self.loop_in.watch_done():
             raise IncorrectLevel
 
-        delay(10*us)
+        self.core.delay(10.*us)
         if not self.loop_in.watch_stay_off():
             raise IncorrectLevel
-        delay(3*us)
+        self.core.delay(3.*us)
         self.loop_out.on()
-        delay(10*us)
+        self.core.delay(10.*us)
         if self.loop_in.watch_done():
             raise IncorrectLevel
 
 
+@nac3
 class Underflow(EnvExperiment):
+    core: KernelInvariant[Core]
+    ttl_out: KernelInvariant[TTLOut]
+
     def build(self):
         self.setattr_device("core")
         self.setattr_device("ttl_out")
@@ -336,11 +393,15 @@ class Underflow(EnvExperiment):
     def run(self):
         self.core.reset()
         while True:
-            delay(25*ns)
-            self.ttl_out.pulse(25*ns)
+            self.core.delay(25.*ns)
+            self.ttl_out.pulse(25.*ns)
 
 
+@nac3
 class SequenceError(EnvExperiment):
+    core: KernelInvariant[Core]
+    ttl_out: KernelInvariant[TTLOut]
+
     def build(self):
         self.setattr_device("core")
         self.setattr_device("ttl_out")
@@ -348,13 +409,17 @@ class SequenceError(EnvExperiment):
     @kernel
     def run(self):
         self.core.reset()
-        delay(55*256*us)
+        self.core.delay(55.*256.*us)
         for _ in range(256):
-            self.ttl_out.pulse(25*us)
-            delay(-75*us)
+            self.ttl_out.pulse(25.*us)
+            self.core.delay(-75.*us)
 
 
+@nac3
 class Collision(EnvExperiment):
+    core: KernelInvariant[Core]
+    ttl_out_serdes: KernelInvariant[TTLOut]
+
     def build(self):
         self.setattr_device("core")
         self.setattr_device("ttl_out_serdes")
@@ -362,15 +427,18 @@ class Collision(EnvExperiment):
     @kernel
     def run(self):
         self.core.reset()
-        delay(5*ms)  # make sure we won't get underflow
+        self.core.delay(5.*ms)  # make sure we won't get underflow
         for i in range(16):
-            self.ttl_out_serdes.pulse_mu(1)
-            delay_mu(1)
+            self.ttl_out_serdes.pulse_mu(int64(1))
+            delay_mu(int64(1))
         while self.core.get_rtio_counter_mu() < now_mu():
             pass
 
 
 class AddressCollision(EnvExperiment):
+    core: KernelInvariant[Core]
+    loop_in: KernelInvariant[TTLInOut]
+
     def build(self):
         self.setattr_device("core")
         self.setattr_device("loop_in")
@@ -384,7 +452,10 @@ class AddressCollision(EnvExperiment):
             pass
 
 
+@nac3
 class TimeKeepsRunning(EnvExperiment):
+    core: KernelInvariant[Core]
+
     def build(self):
         self.setattr_device("core")
 
@@ -394,12 +465,15 @@ class TimeKeepsRunning(EnvExperiment):
         self.set_dataset("time_at_start", now_mu())
 
 
+@nac3
 class Handover(EnvExperiment):
+    core: KernelInvariant[Core]
+
     def build(self):
         self.setattr_device("core")
 
     @kernel
-    def k(self, var):
+    def k(self, var: str):
         self.set_dataset(var, now_mu())
         delay_mu(1234)
 
@@ -408,7 +482,10 @@ class Handover(EnvExperiment):
         self.k("t2")
 
 
+@nac3
 class Rounding(EnvExperiment):
+    core: KernelInvariant[Core]
+
     def build(self):
         self.setattr_device("core")
 
@@ -416,7 +493,7 @@ class Rounding(EnvExperiment):
     def run(self):
         self.core.reset()
         t1 = now_mu()
-        delay(8*us)
+        self.core.delay(8.*us)
         t2 = now_mu()
         self.set_dataset("delta", t2 - t1)
 
@@ -425,12 +502,15 @@ class DummyException(Exception):
     pass
 
 
+@nac3
 class HandoverException(EnvExperiment):
+    core: KernelInvariant[Core]
+
     def build(self):
         self.setattr_device("core")
 
     @kernel
-    def k(self, var):
+    def k(self, var: str):
         self.set_dataset(var, now_mu())
         delay_mu(1234)
         raise DummyException
@@ -447,6 +527,7 @@ class HandoverException(EnvExperiment):
 
 
 class CoredeviceTest(ExperimentCase):
+    @unittest.skip("NAC3TODO: set_dataset")
     def test_rtio_counter(self):
         self.execute(RTIOCounter)
         dt = self.dataset_mgr.get("dt")
@@ -457,6 +538,7 @@ class CoredeviceTest(ExperimentCase):
     def test_wait_for_rtio_counter(self):
         self.execute(WaitForRTIOCounter)
 
+    @unittest.skip("NAC3TODO: set_dataset")
     def test_loopback(self):
         self.execute(Loopback)
         rtt = self.dataset_mgr.get("rtt")
@@ -465,6 +547,7 @@ class CoredeviceTest(ExperimentCase):
         # on Kasli systems, this has to go through the isolated DIO card
         self.assertLess(rtt, 170*ns)
 
+    @unittest.skip("NAC3TODO: set_dataset")
     def test_clock_generator_loopback(self):
         self.execute(ClockGeneratorLoopback)
         count = self.dataset_mgr.get("count")
@@ -490,6 +573,7 @@ class CoredeviceTest(ExperimentCase):
         self.assertGreater(rate, 1*us)
         self.assertLess(rate, 16*us)
 
+    @unittest.skip("NAC3TODO: set_dataset")
     def test_loopback_count(self):
         npulses = 2
         self.execute(LoopbackCount, npulses=npulses)
@@ -527,6 +611,7 @@ class CoredeviceTest(ExperimentCase):
     def test_address_collision(self):
         self.execute_and_test_in_log(AddressCollision, "RTIO collision")
 
+    @unittest.skip("NAC3TODO: set_dataset")
     def test_time_keeps_running(self):
         self.execute(TimeKeepsRunning)
         t1 = self.dataset_mgr.get("time_at_start")
@@ -538,16 +623,19 @@ class CoredeviceTest(ExperimentCase):
         self.assertGreater(dead_time, 1*ms)
         self.assertLess(dead_time, 2500*ms)
 
+    @unittest.skip("NAC3TODO: set_dataset")
     def test_handover(self):
         self.execute(Handover)
         self.assertEqual(self.dataset_mgr.get("t1") + 1234,
                          self.dataset_mgr.get("t2"))
 
+    @unittest.skip("NAC3TODO: set_dataset")
     def test_handover_exception(self):
         self.execute(HandoverException)
         self.assertEqual(self.dataset_mgr.get("t1") + 1234,
                          self.dataset_mgr.get("t2"))
 
+    @unittest.skip("NAC3TODO: set_dataset")
     def test_rounding(self):
         self.execute(Rounding)
         dt = self.dataset_mgr.get("delta")
@@ -555,6 +643,8 @@ class CoredeviceTest(ExperimentCase):
 
 
 class RPCTiming(EnvExperiment):
+    core: KernelInvariant[Core]
+
     def build(self, repeats=100):
         self.setattr_device("core")
         self.repeats = repeats
@@ -591,40 +681,47 @@ class RPCTest(ExperimentCase):
         self.assertLess(self.dataset_mgr.get("rpc_time_stddev"), 1*ms)
 
 
+# @nac3 NAC3TODO: set_dataset
 class _DMA(EnvExperiment):
-    def build(self, trace_name="test_rtio"):
+    core: KernelInvariant[Core]
+    core_dma: KernelInvariant[CoreDMA]
+    ttl_out: KernelInvariant[TTLOut]
+    trace_name: KernelInvariant[str]
+    delta: Kernel[int64]
+
+    def build(self, trace_name: str = "test_rtio"):
         self.setattr_device("core")
         self.setattr_device("core_dma")
         self.setattr_device("ttl_out")
         self.trace_name = trace_name
-        self.delta = np.int64(0)
+        self.delta = int64(0)
 
     @kernel
-    def record(self, for_handle=True):
+    def record(self, for_handle: bool =True):
         with self.core_dma.record(self.trace_name):
             # When not using the handle, retrieving the DMA trace
             # in dma.playback() can be slow. Allow some time.
             if not for_handle:
-                delay(1*ms)
-            delay(100*ns)
+                self.core.delay(1.*ms)
+            self.core.delay(100.*ns)
             self.ttl_out.on()
-            delay(100*ns)
+            self.core.delay(100.*ns)
             self.ttl_out.off()
 
     @kernel
-    def record_many(self, n):
+    def record_many(self, n: int32):
         t1 = self.core.get_rtio_counter_mu()
         with self.core_dma.record(self.trace_name):
             for i in range(n//2):
-                delay(100*ns)
+                self.core.delay(100.*ns)
                 self.ttl_out.on()
-                delay(100*ns)
+                self.core.delay(100.*ns)
                 self.ttl_out.off()
         t2 = self.core.get_rtio_counter_mu()
         self.set_dataset("dma_record_time", self.core.mu_to_seconds(t2 - t1))
 
     @kernel
-    def playback(self, use_handle=True):
+    def playback(self, use_handle: bool = True):
         if use_handle:
             handle = self.core_dma.get_handle(self.trace_name)
             self.core.break_realtime()
@@ -637,13 +734,13 @@ class _DMA(EnvExperiment):
         self.delta = now_mu() - start
 
     @kernel
-    def playback_many(self, n, add_delay=False):
+    def playback_many(self, n: int32, add_delay: bool = False):
         handle = self.core_dma.get_handle(self.trace_name)
         self.core.break_realtime()
         t1 = self.core.get_rtio_counter_mu()
         for i in range(n):
             if add_delay:
-                delay(2*us)
+                self.core.delay(2.*us)
             self.core_dma.playback_handle(handle)
         t2 = self.core.get_rtio_counter_mu()
         self.set_dataset("dma_playback_time", self.core.mu_to_seconds(t2 - t1))
@@ -659,7 +756,7 @@ class _DMA(EnvExperiment):
                 pass
 
     @kernel
-    def invalidate(self, mode):
+    def invalidate(self, mode: int32):
         self.record()
         handle = self.core_dma.get_handle(self.trace_name)
         if mode == 0:
@@ -669,6 +766,7 @@ class _DMA(EnvExperiment):
         self.core_dma.playback_handle(handle)
 
 
+@unittest.skip("NAC3TODO: set_dataset")
 class DMATest(ExperimentCase):
     def test_dma_storage(self):
         exp = self.create(_DMA)
