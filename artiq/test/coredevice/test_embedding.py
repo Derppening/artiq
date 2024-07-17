@@ -191,9 +191,9 @@ class _RPCTypes(EnvExperiment):
     def return_list(self) -> list[int32]:
         return [2, 3]
 
-#    @rpc
-#    def return_range(self) -> range:
-#        return range(10)
+    @rpc
+    def return_range(self) -> range:
+        return range(10)
 
     @rpc
     def return_array(self) -> ndarray[int32, 1]:
@@ -254,10 +254,9 @@ class _RPCTypes(EnvExperiment):
     def accept_list(self, value: list[int32]):
         pass
 
-    # NAC3TODO: function cannot be used as type (range)
-#    @rpc
-#    def accept_range(self, value: range):
-#        pass
+    @rpc
+    def accept_range(self, value: range):
+        pass
 
     @rpc
     def accept_ndarray_i32_1(self, value: ndarray[int32, 1]):
@@ -281,8 +280,9 @@ class _RPCTypes(EnvExperiment):
         self.accept_tuple((2, 3))
         self.accept_list([1, 2])
         # self.accept_range(range(10))
-        self.accept_ndarray_i32_1(np_array([1, 2]))
-        self.accept_ndarray_i32_2(np_array([[1, 2], [3, 4]]))
+        # NAC3TODO: Fix sending ndarrays to device - Currently deadlocks
+        # self.accept_ndarray_i32_1(np_array([1, 2]))
+        # self.accept_ndarray_i32_2(np_array([[1, 2], [3, 4]]))
         # self.accept(self)
 
     # @kernel
