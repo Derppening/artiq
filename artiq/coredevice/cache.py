@@ -23,22 +23,23 @@ class CoreCache:
         self.core = dmgr.get(core_device)
 
     # NAC3TODO
-    # @kernel
-    # def get(self, key: str) -> list[int32]:
-    #     """Extract a value from the core device cache.
-    #     After a value is extracted, it cannot be replaced with another value using
-    #     :meth:`put` until all kernel functions finish executing; attempting
-    #     to replace it will result in a :class:`artiq.coredevice.exceptions.CacheError`.
-    #
-    #     If the cache does not contain any value associated with ``key``, an empty list
-    #     is returned.
-    #
-    #     The value is not copied, so mutating it will change what's stored in the cache.
-    #
-    #     :param str key: cache key
-    #     :return: a list of 32-bit integers
-    #     """
-    #     return cache_get(key)
+    @kernel
+    def get(self, key: str) -> list[int32]:
+        """Extract a value from the core device cache.
+        After a value is extracted, it cannot be replaced with another value using
+        :meth:`put` until all kernel functions finish executing; attempting
+        to replace it will result in a :class:`artiq.coredevice.exceptions.CacheError`.
+
+        If the cache does not contain any value associated with ``key``, an empty list
+        is returned.
+
+        The value is not copied, so mutating it will change what's stored in the cache.
+
+        :param str key: cache key
+        :return: a list of 32-bit integers
+        """
+        return []
+        # return cache_get(key)
 
     @kernel
     def put(self, key: str, value: list[int32]):
@@ -49,4 +50,5 @@ class CoreCache:
         :param str key: cache key
         :param list value: a list of 32-bit integers
         """
-        cache_put(key, value)
+        pass
+        # cache_put(key, value)
