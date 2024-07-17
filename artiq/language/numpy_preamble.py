@@ -8,8 +8,11 @@ __all__ = ["ndarray", "np_array", "int64", "np_sqrt"]
 
 T = TypeVar('T')
 N = TypeVar("N", bound=np.uint64)
+
+
 class _NDArrayDummy(Generic[T, N]):
     pass
+
 
 ndarray = Union[npt.NDArray[T], _NDArrayDummy[T, N]]
 

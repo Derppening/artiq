@@ -1,6 +1,7 @@
 from artiq.language import core, environment, units, scan, numpy_preamble
 from artiq.language.core import *
 from artiq.language.environment import *
+from artiq.language.numpy_preamble import *
 from artiq.language.units import *
 from artiq.language.scan import *
 from . import import_cache
