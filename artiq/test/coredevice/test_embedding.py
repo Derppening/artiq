@@ -417,12 +417,13 @@ class AnnotationTest(ExperimentCase):
         self.assertEqual(exp.overflow(int64(1)), True)
         exp.monomorphize([])
 
-#@nac3 NAC3TODO: list::__mul__
+
+@nac3
 class _Async(EnvExperiment):
     def build(self):
         self.setattr_device("core")
 
-    @rpc # NAC3TODO (flags={"async"})
+    @rpc(flags={"async"})
     def recv_async(self, data: list[int32]):
         pass
 
@@ -434,7 +435,6 @@ class _Async(EnvExperiment):
         self.recv_async([0]*4096)
 
 
-@unittest.skip("nac3 list::__mul__")
 class AsyncTest(ExperimentCase):
     def test_args(self):
         exp = self.create(_Async)
@@ -496,7 +496,7 @@ class _ListTuple(EnvExperiment):
             [int32(base_b + i) for i in range(n)]
 
 
-#@nac3 NAC3TODO: list::__ne__
+@nac3
 class _NestedTupleList(EnvExperiment):
     data: KernelInvariant[list[tuple[int32, list[tuple[str, list[float], list[int32]]]]]]
 
@@ -517,7 +517,7 @@ class _NestedTupleList(EnvExperiment):
             raise ValueError
 
 
-#@nac3 NAC3TODO: list::__ne__
+@nac3
 class _EmptyList(EnvExperiment):
     def build(self):
         self.setattr_device("core")
@@ -537,11 +537,9 @@ class ListTupleTest(ExperimentCase):
     def test_list_tuple(self):
         self.create(_ListTuple).run()
 
-    @unittest.skip("nac3 list::__ne__")
     def test_nested_tuple_list(self):
         self.create(_NestedTupleList).run()
 
-    @unittest.skip("nac3 list::__ne__")
     def test_empty_list(self):
         self.create(_EmptyList).run()
 
