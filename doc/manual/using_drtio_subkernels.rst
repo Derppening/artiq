@@ -5,7 +5,7 @@ In larger or more spread-out systems, a single core device might not be suited t
 
 While the components of a system, as well as the distribution of peripherals among satellites, are necessarily fixed in the system configuration, the specific topology of master and satellite links is flexible and can be changed whenever necessary. It is supplied to the core device by means of a routing table (see below). Kasli and Kasli-SoC devices use SFP ports for DRTIO connections. Links should be high-speed duplex serial lines operating 1Gbps or more.
 
-Certain peripheral cards with onboard FPGAs of their own (e.g. Shuttler) can be configured as satellites in a DRTIO setting, allowing them to run their own subkernels and make use of DDMA. In these cases, the EEM connection to the core device is used for DRTIO communication (DRTIO-over-EEM).
+Certain peripheral cards with onboard FPGAs of their own (e.g. Shuttler, Songbird, Phaser MTDDS) function as DRTIO satellites within ARTIQ, allowing them to run their own subkernels and make use of DDMA. In these cases, the EEM connection to the core device is used for DRTIO communication (DRTIO-over-EEM). In these systems, the main carrier card must be flashed and configured as a DRTIO master, regardless of whether any further satellite carriers are present.
 
 .. note::
     As with other configuration changes (e.g. adding new hardware), if you are in possession of a non-distributed ARTIQ system and you'd like to expand it into a DRTIO setup, it's easily possible to do so, but you need to be sure that both master and satellite are (re)flashed with this in mind. As usual, if you obtained your hardware from M-Labs, you will normally be supplied with all the binaries you need, through :mod:`~artiq.frontend.afws_client` or otherwise.
@@ -48,6 +48,9 @@ By default, DRTIO assumes a routing table for a star topology (i.e. all satellit
 
 Destination numbers must correspond to the ones used in the :ref:`device database <device-db>`, listed in the ``satellite_cpu_targets`` field. If unsure which destination number corresponds to which physical satellite device, check the channel numbers of the peripherals associated with that device; in DRTIO systems bits 16-24 of the RTIO channel number correspond to the destination number of the core device they are bound to. See also the :doc:`drtio` page.
 
+.. note::
+    DRTIO peripherals must also be included in the routing table. On Kasli and Kasli-SoC, DRTIO-over-EEM connections are assigned routing numbers sequentially, starting after all *possible* SFP connections; that is, the first DRTIO peripheral will always be assigned destination #4 on Kasli 2.0, #5 on Kasli-SoC, regardless of whether any of the SFP ports are occupied. Further DRTIO peripherals simply count up.
+
 All routes must end with the local RTIO core of the destination device. Incorrect routing tables will cause ``RTIODestinationUnreachable`` exceptions. The local RTIO core of the master device is considered a destination like any other; it must be explicitly listed in the routing table to be accessible to kernels.
 
 As with other configuration changes, the core device should be restarted (``artiq_coremgmt reboot``, power cycle, etc.) for changes to take effect.
@@ -56,9 +59,21 @@ Using the core language with DRTIO
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Remote channels are accessed just as local channels are (e.g., most commonly, by calling ``self.setattr_device()`` and then referencing the device by name.)
 
+.. _drtio-eem-clock-skew:
+
 Link establishment
 ^^^^^^^^^^^^^^^^^^
 After devices have booted, it takes several seconds for all links in a DRTIO system to become established. Kernels should not attempt to access destinations until all required links are up (trying to do so will raise ``RTIODestinationUnreachable`` exceptions). ARTIQ provides the method :meth:`~artiq.coredevice.core.Core.get_rtio_destination_status` which determines whether a destination can be reached. We recommend calling it in a loop in your startup kernel for each important destination in order to delay startup until they all can be reached.
+
+.. warning::
+    DRTIO-over-EEM links must compensate for clock skew, which is automatically detected and remembered by both the core device and the peripheral the first time a link is used. If any component of the link is changed, the stored valued will become out-of-date and must be manually reset in order to force a re-evaluation. Concretely, that means if either the carrier or peripheral card are reflashed or replaced, *or* if an EEM or clocking cable between them is replaced, the ``eem_drtio_delay`` value must be deleted in the :ref:`configuration storage<configuration-storage>` of both cards.
+
+    For peripherals and Kasli, use :mod:`~artiq.frontend.artiq_coremgmt` or :mod:`~artiq.frontend.artiq_flash` as necessary: ::
+
+    $ artiq_coremgmt config remove eem_drtio_delay
+    $ artiq_flash erase=storage -t [kasli, phaser, efc1v0, efc1v0]
+
+    Note however that the latter deletes *all* config data, including ``ip``, ``rtio_clock``, et cetera. For Zynq-based cards, remove the ``eem_drtio_delay`` line from the SD card ``Config`` file directly.
 
 Latency
 ^^^^^^^

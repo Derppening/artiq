@@ -80,6 +80,8 @@ fix unreliable DRTIO master-satellite links?
 
 Inconsistent DRTIO connections, especially with odd or absent errors in the core logs, are often a symptom of overheating either in the master or satellite boards. Check the core device fans for failure or defects. Improve air circulation around the crate or attach additional fans to see if that improves or resolves the issue. In the long term, fan trays to be rack-mounted together with the crate are a clean solution to these kinds of problems.
 
+Alternatively, if the problem is a DRTIO-over-EEM connection which is no longer able to successfully establish a link, it's possible the connection simply needs to be recalibrated, especially if you've changed something about your system configuration recently. This calibration is only necessary for DRTIO-over-EEM and cannot be a problem for standard DRTIO links. See the warning in :ref:`drtio-eem-clock-skew`.
+
 fix delay between DRTIO master and satellite cores?
 ---------------------------------------------------
 
