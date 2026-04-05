@@ -213,7 +213,7 @@ Upgrading ARTIQ
 ---------------
 
 .. note::
-    When you upgrade ARTIQ, as well as updating the software on your host machine, it may also be necessary to reflash the gateware and firmware of your core device to keep them compatible. New numbered release versions in particular incorporate breaking changes and are not generally compatible. See :doc:`flashing` for instructions.
+    When you upgrade ARTIQ, as well as updating the software on your host machine, it may also be necessary to reflash the gateware and firmware of your core device (and in some cases the gateware and firmware of DRTIO peripherals) to keep them compatible. New numbered release versions in particular incorporate breaking changes and are not generally compatible. See :doc:`flashing` for instructions.
 
 Upgrading with Nix
 ^^^^^^^^^^^^^^^^^^

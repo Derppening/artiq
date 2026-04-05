@@ -65,6 +65,11 @@ Some things to consider:
     - Is some other device in your network already using the configured IP address? Turn off the core device and try pinging the configured IP address; if it responds, you have a culprit. One of the two will need a different networking configuration.
     - Are there restrictions or issues in your router or subnet that are preventing the core device from connecting? It may help to try connecting the core device to your PC directly.
 
+upgrade ARTIQ in a Sinara crate with DRTIO peripherals, or upgrade my Phaser to use MultiTone DDS?
+--------------------------------------------------------------------------------------------------
+
+ARTIQ DRTIO peripherals such as Sinara's Shuttler, Songbird, and Phaser in the MultiTone DDS configuration operate as DRTIO satellite cores and must be reflashed much like carrier cards. See :ref:`writing-drio-peripherals`.
+
 fix 'Mismatch between gateware and software versions'?
 ------------------------------------------------------
 

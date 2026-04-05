@@ -93,6 +93,29 @@ Satellite devices can at any time be flashed directly through the SD card or :mo
 
   $ artiq_coremgmt [-D IP_address] -s <destination_number> flash <afws_directory>
 
+.. _writing-drio-peripherals:
+
+Writing to DRTIO peripherals
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Most ARTIQ/Sinara peripherals use no firmware or only very rarely require updates. The exceptions are DRTIO peripherals such as Sinara's Shuttler, Songbird, and Phaser in the MultiTone DDS configuration. These cards operate as DRTIO satellite cores, with a CPU capable of running subkernels, and need to be updated with major ARTIQ version changes.
+
+In a full system update, DRTIO peripherals should be flashed before the core device. They are flashed similarly to Kasli. If already connected to DRTIO, :mod:`~artiq.frontend.artiq_coremgmt` can be used as above: ::
+
+  $ artiq_coremgmt -s <destination_number> flash <gateware_directory>
+
+Alternatively, connect the card directly to your computer via JTAG adapter and an appropriate cable, then use :mod:`~artiq.frontend.artiq_flash`: ::
+
+  $ artiq_flash --srcbuild -t phaser -d <gateware_directory>
+  $ artiq_flash --srcbuild -t [efc1v0, efc1v1] -d <gateware_directory>
+
+.. note::
+  Both Shuttler and Songbird are based on the Sinara EEM FMC Carrier and should be flashed with either ``-t efc1v0`` or ``-t efc1v1`` depending on the hardware revision of the EEM FMC Carrier itself, v1.0 or v.1.1. The gateware itself for the two cards is not interchangeable and should not be confused.
+
+Reconfiguring a Phaser in the Classic configuration to MultiTone DDS is as simple as flashing it with MultiTone DDS gateware. Since Phaser Classic is not a DRTIO target, it will be necessary to use :mod:`~artiq.frontend.artiq_flash` for initial setup.
+
+Note that :mod:`~artiq.frontend.artiq_flash` does not provide an utility for reverting to Phaser Classic or MIQRO gateware, which should be done through the respective flashing procedures for those variants.
+
 .. _connecting-uart:
 
 Connecting to the UART log
