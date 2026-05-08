@@ -9,6 +9,7 @@ ENTRY(_reset_handler)
  * First 384K of kernel memory are for support code.
  * Support code is loaded at ORIGIN-0x80 so that ELF headers
  * are also loaded.
+ * 8M at the upper end of kernel memory are reserved for the kernel heap.
  */
 MEMORY {
     ksupport (RWX) : ORIGIN = 0x45000000, LENGTH = 0x60000

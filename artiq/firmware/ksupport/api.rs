@@ -142,6 +142,9 @@ static mut API: &'static [(&'static str, *const ())] = &[
 
     api!(now = csr::rtio::NOW_HI_ADDR as *const _),
 
+    api!(malloc = ::malloc),
+    api!(free = ::free),
+
     api!(rpc_send = ::rpc_send),
     api!(rpc_send_async = ::rpc_send_async),
     api!(rpc_recv = ::rpc_recv),

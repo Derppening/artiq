@@ -14,8 +14,9 @@ extern crate board_misoc;
 extern crate board_artiq;
 extern crate proto_artiq;
 extern crate riscv;
+extern crate alloc_list;
 
-use core::{mem, ptr, slice, str, convert::TryFrom};
+use core::{mem, ptr, slice, str, convert::TryFrom, alloc::Layout};
 use cslice::CSlice;
 use io::Cursor;
 use dyld::Library;
@@ -116,6 +117,33 @@ mod nrt_bus;
 mod cxp;
 
 static mut LIBRARY: Option<Library<'static>> = None;
+static mut ALLOC: alloc_list::ListAlloc = alloc_list::EMPTY;
+
+fn heap_reset() {
+    unsafe {
+        ALLOC = alloc_list::EMPTY;
+        ALLOC.add(kernel_proto::KERNELCPU_HEAP_ADDRESS as *mut u8,
+                  kernel_proto::KERNELCPU_HEAP_SIZE);
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn malloc(size: usize) -> *mut u8 {
+    let layout = Layout::from_size_align(size, 8).unwrap();
+    let ptr = core::alloc::GlobalAlloc::alloc(&ALLOC, layout);
+    if ptr.is_null() {
+        panic!("kernel CPU heap exhausted (requested {:#x} bytes)", size);
+    }
+    ptr
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn free(ptr: *mut u8) {
+    if ptr.is_null() { return; }
+    // ListAlloc::dealloc ignores the layout, so we pass a dummy.
+    let layout = Layout::from_size_align(1, 8).unwrap();
+    core::alloc::GlobalAlloc::dealloc(&ALLOC, ptr, layout);
+}
 
 #[no_mangle]
 pub extern fn send_to_core_log(text: CSlice<u8>) {
@@ -639,7 +667,7 @@ static mut STACK_GUARD_BASE: usize = 0x0;
 pub unsafe fn main() {
     eh_artiq::reset_exception_buffer(KERNELCPU_PAYLOAD_ADDRESS);
     let image = slice::from_raw_parts_mut(kernel_proto::KERNELCPU_PAYLOAD_ADDRESS as *mut u8,
-                                          kernel_proto::KERNELCPU_LAST_ADDRESS -
+                                          kernel_proto::KERNELCPU_HEAP_ADDRESS -
                                           kernel_proto::KERNELCPU_PAYLOAD_ADDRESS);
 
     let library = recv!(&LoadRequest(library) => {
@@ -673,6 +701,7 @@ pub unsafe fn main() {
     LIBRARY = Some(library);
 
     ptr::write_bytes(__bss_start as *mut u8, 0, (_end - __bss_start) as usize);
+    heap_reset();
 
     board_misoc::pmp::init_stack_guard(_sstack_guard as usize);
     STACK_GUARD_BASE = _sstack_guard as usize;
