@@ -1,15 +1,11 @@
-#![feature(never_type, alloc_error_handler)]
+#![feature(lang_items, panic_info_message, const_btree_new, iter_advance_by, never_type)]
 #![no_std]
-
-#[macro_use]
-extern crate alloc;
-use alloc::collections::BTreeMap;
-
-use core::{cell::{Cell, RefCell}, convert::TryFrom, panic::PanicInfo};
 
 extern crate crc;
 extern crate dyld;
 extern crate eh;
+#[macro_use]
+extern crate alloc;
 extern crate failure;
 #[macro_use]
 extern crate failure_derive;
@@ -33,6 +29,9 @@ extern crate riscv;
 #[cfg(has_drtio)]
 extern crate tar_no_std;
 
+use alloc::collections::BTreeMap;
+use core::cell::{RefCell, Cell};
+use core::convert::TryFrom;
 use smoltcp::wire::HardwareAddress;
 use urc::Urc;
 
@@ -54,10 +53,7 @@ use board_artiq::drtio_eem;
 #[cfg(has_rtio_analyzer)]
 use proto_artiq::analyzer_proto;
 
-use riscv::{
-    interrupt::{Exception, Interrupt, Trap},
-    register::{mcause, mepc, mtval},
-};
+use riscv::register::{mcause, mepc, mtval};
 use smoltcp::iface::Routes;
 use ip_addr_storage::InterfaceBuilderEx;
 
@@ -284,9 +280,9 @@ static mut ALLOC: alloc_list::ListAlloc = alloc_list::EMPTY;
 static mut LOG_BUFFER: [u8; 1<<17] = [0; 1<<17];
 
 #[no_mangle]
-pub extern "C" fn main() -> i32 {
+pub extern fn main() -> i32 {
     unsafe {
-        extern "C" {
+        extern {
             static mut _fheap: u8;
             static mut _eheap: u8;
             static mut _sstack_guard: u8;
@@ -330,26 +326,29 @@ pub struct TrapFrame {
 }
 
 #[no_mangle]
-pub extern "C" fn exception(regs: *const TrapFrame) {
+pub extern fn exception(regs: *const TrapFrame) {
     let pc = mepc::read();
-    let cause: Trap<Interrupt, Exception> = mcause::read().cause().try_into().unwrap();
+    let cause = mcause::read().cause();
     match cause {
-        Trap::Interrupt(_source) => {
+        mcause::Trap::Interrupt(_source) => {
             #[cfg(has_wrpll)]
             if irq::is_pending(csr::WRPLL_INTERRUPT) {
                 si549::wrpll::interrupt_handler();
             }
         },
-        Trap::Exception(Exception::UserEnvCall) => unsafe {
-            if (*regs).a7 == 0 {
-                pmp::pop_pmp_region()
-            } else {
-                pmp::push_pmp_region((*regs).a7)
-            }
 
+        mcause::Trap::Exception(mcause::Exception::UserEnvCall) => {
+            unsafe {
+                if (*regs).a7 == 0 {
+                    pmp::pop_pmp_region()
+                } else {
+                    pmp::push_pmp_region((*regs).a7)
+                }
+            }
             mepc::write(pc + 4);
         },
-        Trap::Exception(e) => {
+
+        mcause::Trap::Exception(e) => {
             println!("Trap frame: {:x?}", unsafe { *regs });
 
             fn hexdump(addr: u32) {
@@ -373,18 +372,20 @@ pub extern "C" fn exception(regs: *const TrapFrame) {
 }
 
 #[no_mangle]
-pub extern "C" fn abort() {
+pub extern fn abort() {
     println!("aborted");
     loop {}
 }
 
-#[alloc_error_handler] // https://github.com/rust-lang/rust/issues/51540
+#[no_mangle] // https://github.com/rust-lang/rust/issues/{38281,51647}
+#[lang = "oom"] // https://github.com/rust-lang/rust/issues/51540
 pub fn oom(layout: core::alloc::Layout) -> ! {
     panic!("heap view: {}\ncannot allocate layout: {:?}", unsafe { &ALLOC }, layout)
 }
 
+#[no_mangle] // https://github.com/rust-lang/rust/issues/{38281,51647}
 #[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
+pub fn panic_impl(info: &core::panic::PanicInfo) -> ! {
     #[cfg(has_error_led)]
     unsafe {
         csr::error_led::out_write(1);
@@ -395,11 +396,10 @@ fn panic(info: &PanicInfo) -> ! {
     } else {
         print!("panic at unknown location");
     }
-    let message = info.message();
-    if message.as_str().map(|s| s.is_empty()).unwrap_or_default() {
-        println!("");
-    } else {
+    if let Some(message) = info.message() {
         println!(": {}", message);
+    } else {
+        println!("");
     }
 
     println!("backtrace for software version {}:", csr::CONFIG_IDENTIFIER_STR);

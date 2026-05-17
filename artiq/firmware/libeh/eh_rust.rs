@@ -37,8 +37,8 @@ const UNWIND_DATA_REG: (i32, i32) = (10, 11); // X10, X11
 // The following code is based on GCC's C and C++ personality routines.  For reference, see:
 // https://github.com/gcc-mirror/gcc/blob/master/libstdc++-v3/libsupc++/eh_personality.cc
 // https://github.com/gcc-mirror/gcc/blob/trunk/libgcc/unwind-c.c
-#[cfg(not(test))]
 #[lang = "eh_personality"]
+#[no_mangle]
 #[allow(unused)]
 unsafe extern "C" fn rust_eh_personality(version: c_int,
                                          actions: uw::_Unwind_Action,

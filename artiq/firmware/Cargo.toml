@@ -1,11 +1,7 @@
 [workspace]
 members = ["bootloader", "runtime", "ksupport", "satman"]
 
-[profile.release]
-panic = "unwind"
-
 [profile.dev]
 incremental = false # incompatible with LTO
 lto = true
 debug = 2
-panic = "unwind"

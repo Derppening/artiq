@@ -1,4 +1,5 @@
 #![no_std]
+#![feature(asm)]
 
 extern crate byteorder;
 #[cfg(feature = "log")]

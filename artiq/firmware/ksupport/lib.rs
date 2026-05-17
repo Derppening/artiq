@@ -1,6 +1,6 @@
+#![feature(lang_items, asm, panic_unwind, libc,
+           panic_info_message, nll, c_unwind)]
 #![no_std]
-
-use core::{convert::TryFrom, mem, panic::PanicInfo, ptr, slice, str};
 
 extern crate byteorder;
 extern crate libc;
@@ -15,6 +15,7 @@ extern crate board_artiq;
 extern crate proto_artiq;
 extern crate riscv;
 
+use core::{mem, ptr, slice, str, convert::TryFrom};
 use cslice::CSlice;
 use io::Cursor;
 use dyld::Library;
@@ -22,10 +23,7 @@ use board_artiq::{mailbox, rpc_queue};
 use proto_artiq::{kernel_proto, rpc_proto};
 use kernel_proto::*;
 use board_misoc::csr;
-use riscv::{
-    interrupt::{Exception, Interrupt, Trap},
-    register::{mcause, mepc, mtval},
-};
+use riscv::register::{mcause, mepc, mtval};
 
 fn send(request: &Message) {
     unsafe { mailbox::send(request as *const _ as usize) }
@@ -61,19 +59,19 @@ macro_rules! recv {
     }
 }
 
+#[no_mangle] // https://github.com/rust-lang/rust/issues/{38281,51647}
 #[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
+pub fn panic_fmt(info: &core::panic::PanicInfo) -> ! {
     if let Some(location) = info.location() {
         send(&Log(format_args!("panic at {}:{}:{}",
                                location.file(), location.line(), location.column())));
     } else {
         send(&Log(format_args!("panic at unknown location")));
     }
-    let message = info.message();
-    if message.as_str().map(|s| s.is_empty()).unwrap_or_default() {
-        send(&Log(format_args!("\n")));
-    } else {
+    if let Some(message) = info.message() {
         send(&Log(format_args!(": {}\n", message)));
+    } else {
+        send(&Log(format_args!("\n")));
     }
     send(&RunAborted);
     loop {}
@@ -120,7 +118,7 @@ mod cxp;
 static mut LIBRARY: Option<Library<'static>> = None;
 
 #[no_mangle]
-pub extern "C" fn send_to_core_log(text: CSlice<u8>) {
+pub extern fn send_to_core_log(text: CSlice<u8>) {
     match str::from_utf8(text.as_ref()) {
         Ok(s) => send(&LogSlice(s)),
         Err(e) => {
@@ -131,11 +129,11 @@ pub extern "C" fn send_to_core_log(text: CSlice<u8>) {
 }
 
 #[no_mangle]
-pub extern "C" fn send_to_rtio_log(text: CSlice<u8>) {
+pub extern fn send_to_rtio_log(text: CSlice<u8>) {
     rtio::log(text.as_ref())
 }
 
-extern "C" fn rpc_send(service: u32, tag: &CSlice<u8>, data: *const *const ()) {
+extern fn rpc_send(service: u32, tag: &CSlice<u8>, data: *const *const ()) {
     while !rpc_queue::empty() {}
     send(&RpcSend {
         async:   false,
@@ -145,7 +143,7 @@ extern "C" fn rpc_send(service: u32, tag: &CSlice<u8>, data: *const *const ()) {
     })
 }
 
-extern "C" fn rpc_send_async(service: u32, tag: &CSlice<u8>, data: *const *const ()) {
+extern fn rpc_send_async(service: u32, tag: &CSlice<u8>, data: *const *const ()) {
     while rpc_queue::full() {}
     rpc_queue::enqueue(|mut slice| {
         let length = {
@@ -214,7 +212,7 @@ fn terminate(exceptions: &'static [Option<eh_artiq::Exception<'static>>],
     loop {}
 }
 
-extern "C" fn cache_get<'a>(key: CSlice<u8>) -> *const CSlice<'a, i32> {
+extern fn cache_get<'a>(key: CSlice<u8>) -> *const CSlice<'a, i32> {
     send(&CacheGetRequest {
         key:   str::from_utf8(key.as_ref()).unwrap()
     });
@@ -335,7 +333,7 @@ unsafe fn dma_record_output_prepare(timestamp: i64, target: i32,
     data
 }
 
-extern "C" fn dma_record_output(target: i32, word: i32) {
+extern fn dma_record_output(target: i32, word: i32) {
     unsafe {
         let timestamp = ((csr::rtio::now_hi_read() as i64) << 32) | (csr::rtio::now_lo_read() as i64);
         let data = dma_record_output_prepare(timestamp, target, 1);
@@ -348,7 +346,7 @@ extern "C" fn dma_record_output(target: i32, word: i32) {
     }
 }
 
-extern "C-unwind" fn dma_record_output_wide(target: i32, words: &CSlice<i32>) {
+extern fn dma_record_output_wide(target: i32, words: &CSlice<i32>) {
     assert!(words.len() <= 16); // enforce the hardware limit
 
     unsafe {
@@ -366,7 +364,7 @@ extern "C-unwind" fn dma_record_output_wide(target: i32, words: &CSlice<i32>) {
     }
 }
 
-extern "C" fn dma_erase(name: CSlice<u8>) {
+extern fn dma_erase(name: CSlice<u8>) {
     let name = str::from_utf8(name.as_ref()).unwrap();
 
     send(&DmaEraseRequest { name: name });
@@ -491,10 +489,10 @@ extern "C-unwind" fn subkernel_load_run(id: u32, destination: u8, run: bool) {
     let timestamp = unsafe {
         ((csr::rtio::now_hi_read() as u64) << 32) | (csr::rtio::now_lo_read() as u64)
     };
-    send(&SubkernelLoadRunRequest {
-        id: id,
-        destination: destination,
-        run: run,
+    send(&SubkernelLoadRunRequest { 
+        id: id, 
+        destination: destination, 
+        run: run, 
         timestamp: timestamp,
     });
     recv!(&SubkernelLoadRunReply { succeeded } => {
@@ -528,20 +526,14 @@ extern "C-unwind" fn subkernel_await_finish(id: u32, timeout: i64) {
     })
 }
 
-extern "C" fn subkernel_send_message(
-    id: u32,
-    is_return: bool,
-    destination: u8,
-    count: u8,
-    tag: &CSlice<u8>,
-    data: *const *const (),
-) {
-    send(&SubkernelMsgSend {
+extern fn subkernel_send_message(id: u32, is_return: bool, destination: u8, 
+    count: u8, tag: &CSlice<u8>, data: *const *const ()) {
+    send(&SubkernelMsgSend { 
         id: id,
         destination: if is_return { None } else { Some(destination) },
         count: count,
         tag: tag.as_ref(),
-        data: data
+        data: data 
     });
 }
 
@@ -714,10 +706,10 @@ pub unsafe fn main() {
 #[no_mangle]
 pub unsafe extern "C-unwind" fn exception(_regs: *const u32) {
     let pc = mepc::read();
-    let cause: Trap<Interrupt, Exception> = mcause::read().cause().try_into().unwrap();
+    let cause = mcause::read().cause();
     let mtval = mtval::read();
-    if cause == Trap::Exception(Exception::LoadFault)
-        || cause == Trap::Exception(Exception::StoreFault)
+    if let mcause::Trap::Exception(mcause::Exception::LoadFault)
+    | mcause::Trap::Exception(mcause::Exception::StoreFault) = cause
     {
         if mtval >= STACK_GUARD_BASE
             && mtval < (STACK_GUARD_BASE + board_misoc::pmp::STACK_GUARD_SIZE)

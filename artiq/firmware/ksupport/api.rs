@@ -2,7 +2,7 @@ use board_misoc::csr;
 
 macro_rules! api {
     ($i:ident) => ({
-        extern "C" { static $i: u8; }
+        extern { static $i: u8; }
         api!($i = &$i as *const _)
     });
     ($i:ident, $d:item) => ({
@@ -66,11 +66,11 @@ static mut API: &'static [(&'static str, *const ())] = &[
 
     /* libc */
     // These functions are automatically available through compiler_builtins.
-    api!(memcpy, extern "C" { fn memcpy(dest: *mut u8, src: *const u8, n: usize) -> *mut u8; }),
-    api!(memmove, extern "C" { fn memmove(dest: *mut u8, src: *const u8, n: usize) -> *mut u8; }),
-    api!(memset, extern "C" { fn memset(s: *mut u8, c: i32, n: usize) -> *mut u8; }),
-    api!(memcmp, extern "C" { fn memcmp(s1: *const u8, s2: *const u8, n: usize) -> i32; }),
-    api!(bcmp, extern "C" { fn bcmp(s1: *const u8, s2: *const u8, n: usize) -> i32; }),
+    api!(memcpy, extern { fn memcpy(dest: *mut u8, src: *const u8, n: usize) -> *mut u8; }),
+    api!(memmove, extern { fn memmove(dest: *mut u8, src: *const u8, n: usize) -> *mut u8; }),
+    api!(memset, extern { fn memset(s: *mut u8, c: i32, n: usize) -> *mut u8; }),
+    api!(memcmp, extern { fn memcmp(s1: *const u8, s2: *const u8, n: usize) -> i32; }),
+    api!(bcmp, extern { fn bcmp(s1: *const u8, s2: *const u8, n: usize) -> i32; }),
     // This is available in compiler_builtins v0.1.71, but that is incompatible with
     // the current rustc; change this to an extern declaration when we upgrade to a newer rustc.
     api!(strlen = ::libc::strlen),

@@ -25,11 +25,11 @@ mod imp {
 
     const OFFSET_MULTIPLE: isize = (csr::CONFIG_DATA_WIDTH_BYTES / 4) as isize;
 
-    pub extern "C" fn init() {
+    pub extern fn init() {
         send(&RtioInitRequest);
     }
 
-    pub extern "C" fn get_destination_status(destination: i32) -> bool {
+    pub extern fn get_destination_status(destination: i32) -> bool {
         if 0 <= destination && destination <= 255 {
             send(&RtioDestinationStatusRequest { destination: destination as u8 });
             recv!(&RtioDestinationStatusReply { up } => up)
@@ -38,7 +38,7 @@ mod imp {
         }
     }
 
-    pub extern "C" fn get_counter() -> i64 {
+    pub extern fn get_counter() -> i64 {
         unsafe {
             csr::rtio::counter_update_write(1);
             csr::rtio::counter_read() as i64
@@ -77,7 +77,7 @@ mod imp {
         }
     }
 
-    pub extern "C" fn output(target: i32, data: i32) {
+    pub extern fn output(target: i32, data: i32) {
         unsafe {
             csr::rtio::target_write(target as u32);
             // writing target clears o_data
@@ -89,7 +89,7 @@ mod imp {
         }
     }
 
-    pub extern "C" fn output_wide(target: i32, data: &CSlice<i32>) {
+    pub extern fn output_wide(target: i32, data: &CSlice<i32>) {
         unsafe {
             csr::rtio::target_write(target as u32);
             // writing target clears o_data
@@ -103,7 +103,7 @@ mod imp {
         }
     }
 
-    pub extern "C" fn input_timestamp(timeout: i64, channel: i32) -> i64 {
+    pub extern fn input_timestamp(timeout: i64, channel: i32) -> i64 {
         unsafe {
             csr::rtio::target_write((channel as u32) << 8);
             csr::rtio::i_timeout_write(timeout as u64);
@@ -131,7 +131,7 @@ mod imp {
         }
     }
 
-    pub extern "C" fn input_data(channel: i32) -> i32 {
+    pub extern fn input_data(channel: i32) -> i32 {
         unsafe {
             csr::rtio::target_write((channel as u32) << 8);
             csr::rtio::i_timeout_write(0xffffffff_ffffffff);
@@ -156,7 +156,7 @@ mod imp {
         }
     }
 
-    pub extern "C" fn input_timestamped_data(timeout: i64, channel: i32) -> TimestampedData {
+    pub extern fn input_timestamped_data(timeout: i64, channel: i32) -> TimestampedData {
         unsafe {
             csr::rtio::target_write((channel as u32) << 8);
             csr::rtio::i_timeout_write(timeout as u64);
@@ -219,35 +219,35 @@ mod imp {
     use cslice::CSlice;
     use rtio::TimestampedData;
 
-    pub extern "C" fn init() {
+    pub extern fn init() {
         unimplemented!("not(has_rtio)")
     }
 
-    pub extern "C" fn get_destination_status(_destination: i32) -> bool {
+    pub extern fn get_destination_status(_destination: i32) -> bool {
         unimplemented!("not(has_rtio)")
     }
 
-    pub extern "C" fn get_counter() -> i64 {
+    pub extern fn get_counter() -> i64 {
         unimplemented!("not(has_rtio)")
     }
 
-    pub extern "C" fn output(_target: i32, _data: i32) {
+    pub extern fn output(_target: i32, _data: i32) {
         unimplemented!("not(has_rtio)")
     }
 
-    pub extern "C" fn output_wide(_target: i32, _data: &CSlice<i32>) {
+    pub extern fn output_wide(_target: i32, _data: &CSlice<i32>) {
         unimplemented!("not(has_rtio)")
     }
 
-    pub extern "C" fn input_timestamp(_timeout: i64, _channel: i32) -> i64 {
+    pub extern fn input_timestamp(_timeout: i64, _channel: i32) -> i64 {
         unimplemented!("not(has_rtio)")
     }
 
-    pub extern "C" fn input_data(_channel: i32) -> i32 {
+    pub extern fn input_data(_channel: i32) -> i32 {
         unimplemented!("not(has_rtio)")
     }
 
-    pub extern "C" fn input_timestamped_data(_timeout: i64, _channel: i32) -> TimestampedData {
+    pub extern fn input_timestamped_data(_timeout: i64, _channel: i32) -> TimestampedData {
         unimplemented!("not(has_rtio)")
     }
 

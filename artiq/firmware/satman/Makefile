@@ -14,8 +14,7 @@ all:: satman.bin satman.fbi
 
 .PHONY: $(RUSTOUT)/libsatman.a
 $(RUSTOUT)/libsatman.a:
-	$(cargo) -Z json-target-spec \
-	--target-dir ./cargo \
+	$(cargo) --target-dir ./cargo \
 	--manifest-path $(SATMAN_DIRECTORY)/Cargo.toml \
 	--target $(SATMAN_DIRECTORY)/../$(CARGO_TRIPLE).json
 

@@ -1,7 +1,5 @@
-#![feature(never_type, asm, default_alloc_error_handler)]
+#![feature(never_type, panic_info_message, asm, default_alloc_error_handler)]
 #![no_std]
-
-use core::{convert::TryFrom, panic::PanicInfo};
 
 #[macro_use]
 extern crate log;
@@ -18,6 +16,7 @@ extern crate cslice;
 extern crate io;
 extern crate eh;
 
+use core::convert::TryFrom;
 use board_misoc::{csr, ident, clock, config, i2c, pmp};
 #[cfg(has_si5324)]
 use board_artiq::si5324;
@@ -32,10 +31,7 @@ use board_artiq::ad9117;
 use proto_artiq::drtioaux_proto::{SAT_PAYLOAD_MAX_SIZE, MASTER_PAYLOAD_MAX_SIZE, CXP_PAYLOAD_MAX_SIZE};
 #[cfg(has_drtio_eem)]
 use board_artiq::drtio_eem;
-use riscv::{
-    interrupt::Trap,
-    register::{mcause, mepc, mtval},
-};
+use riscv::register::{mcause, mepc, mtval};
 use dma::Manager as DmaManager;
 use kernel::Manager as KernelManager;
 use mgmt::Manager as CoreManager;
@@ -394,8 +390,8 @@ fn process_aux_packet(dmamgr: &mut DmaManager, analyzer: &mut Analyzer, kernelmg
             forward!(router, _routing_table, destination, *rank, *self_destination, _repeaters, &packet);
             *self_destination = destination;
             let succeeded = dmamgr.add(source, id, status, &trace, length as usize).is_ok();
-            router.send(drtioaux::Packet::DmaAddTraceReply {
-                source: *self_destination, destination: source, id: id, succeeded: succeeded
+            router.send(drtioaux::Packet::DmaAddTraceReply { 
+                source: *self_destination, destination: source, id: id, succeeded: succeeded 
             }, _routing_table, *rank, *self_destination)
         }
         drtioaux::Packet::DmaAddTraceReply { source, destination: _destination, id, succeeded } => {
@@ -406,15 +402,15 @@ fn process_aux_packet(dmamgr: &mut DmaManager, analyzer: &mut Analyzer, kernelmg
         drtioaux::Packet::DmaRemoveTraceRequest { source, destination: _destination, id } => {
             forward!(router, _routing_table, _destination, *rank, *self_destination, _repeaters, &packet);
             let succeeded = dmamgr.erase(source, id).is_ok();
-            router.send(drtioaux::Packet::DmaRemoveTraceReply {
-                destination: source, succeeded: succeeded
+            router.send(drtioaux::Packet::DmaRemoveTraceReply { 
+                destination: source, succeeded: succeeded 
             }, _routing_table, *rank, *self_destination)
         }
         drtioaux::Packet::DmaPlaybackRequest { source, destination: _destination, id, timestamp } => {
             forward!(router, _routing_table, _destination, *rank, *self_destination, _repeaters, &packet);
             // no DMA with a running kernel
             let succeeded = !kernelmgr.is_running() && dmamgr.playback(source, id, timestamp).is_ok();
-            router.send(drtioaux::Packet::DmaPlaybackReply {
+            router.send(drtioaux::Packet::DmaPlaybackReply { 
                 destination: source, succeeded: succeeded
             }, _routing_table, *rank, *self_destination)
         }
@@ -450,9 +446,9 @@ fn process_aux_packet(dmamgr: &mut DmaManager, analyzer: &mut Analyzer, kernelmg
                     succeeded |= kernelmgr.run(source, id, timestamp).is_ok();
                 }
             }
-            router.send(drtioaux::Packet::SubkernelLoadRunReply {
-                    destination: source, succeeded: succeeded
-                },
+            router.send(drtioaux::Packet::SubkernelLoadRunReply { 
+                    destination: source, succeeded: succeeded 
+                }, 
             _routing_table, *rank, *self_destination)
         }
         drtioaux::Packet::SubkernelLoadRunReply { destination: _destination, succeeded } => {
@@ -892,8 +888,8 @@ fn setup_log_levels() {
 static mut LOG_BUFFER: [u8; 1<<17] = [0; 1<<17];
 
 #[no_mangle]
-pub extern "C" fn main() -> i32 {
-    extern "C" {
+pub extern fn main() -> i32 {
+    extern {
         static mut _fheap: u8;
         static mut _eheap: u8;
         static mut _sstack_guard: u8;
@@ -952,7 +948,7 @@ fn startup() {
     sysclk_setup();
 
     #[cfg(has_si549)]
-    si549::helper_setup(&SI549_SETTINGS).expect("cannot initialize helper Si549");
+    si549::helper_setup(&SI549_SETTINGS).expect("cannot initialize helper Si549");    
 
     #[cfg(soc_platform = "efc")]
     let mut io_expander;
@@ -977,7 +973,7 @@ fn startup() {
 
         // Enable LEDs
         io_expander.set_oe(0, 1 << 5 | 1 << 6 | 1 << 7).unwrap();
-
+        
         // Enable VADJ and P3V3_FMC
         io_expander.set_oe(1, 1 << p3v3_fmc_en_pin | 1 << vadj_fmc_en_pin).unwrap();
 
@@ -1004,7 +1000,7 @@ fn startup() {
         match r {
             Ok("1") => { info!("SED spreading enabled"); toggle_sed_spread(1); },
             Ok("0") => { info!("SED spreading disabled"); toggle_sed_spread(0); },
-            Ok(_) => {
+            Ok(_) => { 
                 warn!("sed_spread_enable value not supported (only 1, 0 allowed), disabling by default");
                 toggle_sed_spread(0);
             },
@@ -1026,7 +1022,7 @@ fn startup() {
     let mut repeaters = [repeater::Repeater::default(); 0];
     for i in 0..repeaters.len() {
         repeaters[i] = repeater::Repeater::new(i as u8);
-    }
+    } 
     let mut routing_table = drtio_routing::RoutingTable::default_empty();
     let mut rank = 1;
     let mut destination = 1;
@@ -1036,7 +1032,7 @@ fn startup() {
 
     #[cfg(all(soc_platform = "efc", has_converter_spi))]
     ad9117::init().expect("AD9117 initialization failed");
-
+    
     loop {
         let mut router = routing::Router::new();
 
@@ -1084,7 +1080,7 @@ fn startup() {
 
         while drtiosat_link_rx_up() {
             drtiosat_process_errors();
-            process_aux_packets(&mut dma_manager, &mut analyzer,
+            process_aux_packets(&mut dma_manager, &mut analyzer, 
                 &mut kernelmgr, &mut coremgr, &mut repeaters, &mut routing_table,
                 &mut rank, &mut router, &mut destination);
             for rep in repeaters.iter_mut() {
@@ -1115,14 +1111,14 @@ fn startup() {
             }
             if let Some(status) = dma_manager.get_status() {
                 info!("playback done, error: {}, channel: {}, timestamp: {}", status.error, status.channel, status.timestamp);
-                router.route(drtioaux::Packet::DmaPlaybackStatus {
+                router.route(drtioaux::Packet::DmaPlaybackStatus { 
                     source: destination, destination: status.source, id: status.id,
-                    error: status.error, channel: status.channel, timestamp: status.timestamp
+                    error: status.error, channel: status.channel, timestamp: status.timestamp 
                 }, &routing_table, rank, destination);
             }
 
             kernelmgr.process_kern_requests(&mut router, &routing_table, rank, destination, &mut dma_manager);
-
+            
             #[cfg(has_drtio_routing)]
             if let Some((repno, packet)) = router.get_downstream_packet() {
                 if let Err(e) = repeaters[repno].aux_send(&packet) {
@@ -1179,17 +1175,18 @@ fn enable_error_led() {
 }
 
 #[no_mangle]
-pub extern "C" fn exception(_regs: *const u32) {
+pub extern fn exception(_regs: *const u32) {
     let pc = mepc::read();
     let cause = mcause::read().cause();
     match cause {
-        Trap::Interrupt(_source) => {
+        mcause::Trap::Interrupt(_source) => {
             #[cfg(has_wrpll)]
             if irq::is_pending(csr::WRPLL_INTERRUPT) {
                 si549::wrpll::interrupt_handler();
             }
         },
-        Trap::Exception(e) => {
+
+        mcause::Trap::Exception(e) => {
             fn hexdump(addr: u32) {
                 let addr = (addr - addr % 4) as *const u32;
                 let mut ptr  = addr;
@@ -1211,13 +1208,14 @@ pub extern "C" fn exception(_regs: *const u32) {
 }
 
 #[no_mangle]
-pub extern "C" fn abort() {
+pub extern fn abort() {
     println!("aborted");
     loop {}
 }
 
+#[no_mangle] // https://github.com/rust-lang/rust/issues/{38281,51647}
 #[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
+pub fn panic_fmt(info: &core::panic::PanicInfo) -> ! {
     #[cfg(has_error_led)]
     unsafe {
         csr::error_led::out_write(1);
@@ -1236,11 +1234,10 @@ fn panic(info: &PanicInfo) -> ! {
         #[cfg(soc_platform = "efc")]
         enable_error_led();
     }
-    let message = info.message();
-    if message.as_str().map(|s| s.is_empty()).unwrap_or_default() {
-        println!("");
-    } else {
+    if let Some(message) = info.message() {
         println!(": {}", message);
+    } else {
+        println!("");
     }
     loop {}
 }

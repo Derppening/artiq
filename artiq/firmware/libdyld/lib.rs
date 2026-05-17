@@ -1,6 +1,6 @@
 #![no_std]
 
-use core::{convert, fmt, mem, ptr, slice, str};
+use core::{mem, ptr, fmt, slice, str, convert};
 use elf::*;
 
 pub mod elf;
@@ -379,6 +379,9 @@ impl<'a> Library<'a> {
         // the symbols that overflowed the bucket.
         symtab_sz = nchain;
 
+        // Drop the mutability. See also the comment below.
+        let image = &*image;
+
         let strtab = get_ref_slice::<u8>(image, strtab_off, strtab_sz)
                                    .map_err(|()| "cannot read string table")?;
         let symtab = get_ref_slice::<Elf32_Sym>(image, symtab_off, symtab_sz)
@@ -393,12 +396,22 @@ impl<'a> Library<'a> {
         let library = Library {
             image_off:   image.as_ptr() as Elf32_Word,
             image_sz:    image.len(),
-            strtab,
-            symtab,
+            strtab:      strtab,
+            symtab:      symtab,
             jmprel:      if pltrel.is_empty() { rela } else { pltrel },
             hash_bucket: &hash[..nbucket],
             hash_chain:  &hash[nbucket..nbucket + nchain],
         };
+
+        // If a borrow exists anywhere, the borrowed memory cannot be mutated except
+        // through that pointer or it's UB. However, we need to retain pointers
+        // to the symbol tables and relocations, and at the same time mutate the code
+        // to resolve the relocations.
+        //
+        // To avoid invoking UB, we drop the only pointer to the entire area (which is
+        // unique since it's a &mut); we retain pointers to the various tables, but
+        // we never write to the memory they refer to, so it's safe.
+        mem::drop(image);
 
         library.resolve_rela(rela, resolve)?;
         library.resolve_rela(pltrel, resolve)?;

@@ -14,8 +14,7 @@ all:: runtime.bin runtime.fbi
 
 .PHONY: $(RUSTOUT)/libruntime.a
 $(RUSTOUT)/libruntime.a:
-	$(cargo) -Z json-target-spec \
-	--target-dir ./cargo \
+	$(cargo) --target-dir ./cargo \
 	--manifest-path $(RUNTIME_DIRECTORY)/Cargo.toml \
 	--target $(RUNTIME_DIRECTORY)/../$(CARGO_TRIPLE).json
 

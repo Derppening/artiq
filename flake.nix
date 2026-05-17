@@ -8,7 +8,7 @@
     };
 
     rust-overlay = {
-      url = "github:oxalica/rust-overlay";
+      url = "github:oxalica/rust-overlay?ref=snapshot/2024-08-01";
       inputs.nixpkgs.follows = "nac3/nixpkgs";
     };
 
@@ -54,9 +54,15 @@
     src-migen,
     src-misoc,
   }: let
+    pkgs' = import nac3.inputs.nixpkgs { system = "x86_64-linux"; };
+    rust-overlay-patched = pkgs'.applyPatches {
+      name = "rust-overlay-patched";
+      src = rust-overlay;
+      patches = [ ./fix-rust-overlay-unpack.diff ];
+    };
     pkgs = import nac3.inputs.nixpkgs {
       system = "x86_64-linux";
-      overlays = [(import rust-overlay)];
+      overlays = [(import rust-overlay-patched)];
     };
     pkgs-aarch64 = import nac3.inputs.nixpkgs {system = "aarch64-linux";};
 
@@ -74,7 +80,7 @@
       QML2_IMPORT_PATH = "${qtbase}/${qtQmlPrefix}";
     };
 
-    rust = pkgs.rust-bin.nightly."2026-03-25".default.override {
+    rust = pkgs.rust-bin.nightly."2021-09-01".default.override {
       extensions = ["rust-src"];
       targets = [];
     };
@@ -224,7 +230,7 @@
       naerskLib.buildPackage {
         name = "artiq-board-${target}-${variant}";
         src = ./artiq/firmware;
-        additionalCargoLock = "${rust}/lib/rustlib/src/rust/library/Cargo.lock";
+        additionalCargoLock = "${rust}/lib/rustlib/src/rust/Cargo.lock";
         singleStep = true;
         nativeBuildInputs = [
           (pkgs.python3.withPackages (ps: [migen misoc artiq-build ps.packaging]))

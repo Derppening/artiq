@@ -1,5 +1,4 @@
-use core::{arch::asm, ptr::{read_volatile, write_volatile}};
-
+use core::ptr::{read_volatile, write_volatile};
 use board_misoc::{mem, cache};
 
 const MAILBOX: *mut usize = mem::MAILBOX_BASE as *mut usize;

@@ -1,5 +1,3 @@
-use core::arch::asm;
-
 #[cfg(has_ddrphy)]
 use core::ptr;
 #[cfg(has_ddrphy)]

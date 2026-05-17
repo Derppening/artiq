@@ -6,12 +6,12 @@
   "emit-debug-gdb-scripts": false,
   "executables": true,
   "features": "+m,+a,-c",
+  "is-builtin": false,
   "linker": "rust-lld",
   "linker-flavor": "ld.lld",
   "llvm-target": "riscv32",
-  "llvm-abiname": "ilp32",
   "max-atomic-width": 32,
   "panic-strategy": "unwind",
   "relocation-model": "static",
-  "target-pointer-width": 32
+  "target-pointer-width": "32"
 }

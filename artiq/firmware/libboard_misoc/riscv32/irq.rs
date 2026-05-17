@@ -1,5 +1,3 @@
-use core::arch::asm;
-
 use riscv::register::{mie, mstatus};
 
 fn vmim_write(val: usize) {

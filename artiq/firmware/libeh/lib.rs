@@ -1,5 +1,4 @@
-#![allow(internal_features)]
-#![feature(lang_items)]
+#![feature(lang_items, panic_unwind, libc)]
 #![no_std]
 
 extern crate cslice;

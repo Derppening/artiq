@@ -18,7 +18,7 @@ pub unsafe fn init_stack_guard(guard_base: usize) {
 }
 
 #[inline(always)]
-pub unsafe fn enable_user_memory() {
+pub fn enable_user_memory() {
     pmpaddr3::write((0x80000000 - 1) >> 3);
     pmpcfg0::write((PMP_L | PMP_NAPOT | PMP_X | PMP_W | PMP_R) << 24);
 }
