@@ -7,8 +7,8 @@ pub const KERNELCPU_EXEC_ADDRESS:    usize = 0x45000000;
 pub const KERNELCPU_PAYLOAD_ADDRESS: usize = 0x45060000;
 pub const KERNELCPU_LAST_ADDRESS:    usize = 0x4fffffff;
 
-pub const KERNELCPU_HEAP_ADDRESS:    usize = 0x4f000000;
-pub const KERNELCPU_HEAP_SIZE:       usize = 0x00800000;
+pub const KERNELCPU_HEAP_ADDRESS:    usize = 0x4c000000;
+pub const KERNELCPU_HEAP_SIZE:       usize = 0x04000000;
 
 // Must match the offset of the first (starting at KERNELCPU_EXEC_ADDRESS)
 // section in ksupport.elf.
