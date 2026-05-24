@@ -101,6 +101,9 @@ Breaking changes:
 
 * Urukul's AD9910 and AD9912 ``pll_n`` argument is now automatically calculated based on the reference clock frequency.
   This argument in device databases is now invalid and must be removed.
+* Urukul protocol revision is assumed to be 9 (newer firmware generation, see
+  `urukul-pld repository <https://git.m-labs.hk/M-Labs/urukul-pld>`_) by default. Older systems using revision 8 should
+  either upgrade their Urukuls or add ``proto_rev: 8`` to system descriptions when generating bitstreams for ARTIQ-9 and up.
 * Experimental features have been removed.
 * SU-Servo coefficient memory have been remapped. Users should re-interpret the record written by Channel.get_profile_mu().
 * ``device_db.py`` now requires all device DB keys to be valid Python identifiers ``[A-Za-z0-9_]``; no special characters (except underscore) are allowed.
