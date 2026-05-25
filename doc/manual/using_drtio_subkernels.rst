@@ -68,9 +68,9 @@ After devices have booted, it takes several seconds for all links in a DRTIO sys
 .. warning::
     DRTIO-over-EEM links must compensate for clock skew, which is automatically detected and remembered by both the core device and the peripheral the first time a link is used. If any component of the link is changed, the stored valued will become out-of-date and must be manually reset in order to force a re-evaluation. Concretely, that means if either the carrier or peripheral card are reflashed or replaced, *or* if an EEM or clocking cable between them is replaced, the ``eem_drtio_delay`` value must be deleted in the :ref:`configuration storage<configuration-storage>` of both cards.
 
-    For peripherals and Kasli, use :mod:`~artiq.frontend.artiq_coremgmt` or :mod:`~artiq.frontend.artiq_flash` as necessary: ::
+    For peripherals and Kasli, use :mod:`~artiq.frontend.artiq_coremgmt` or :mod:`~artiq.frontend.artiq_flash` as necessary (once per card): ::
 
-    $ artiq_coremgmt config remove eem_drtio_delay
+    $ artiq_coremgmt config -s <destination_number> remove eem_drtio_delay
     $ artiq_flash erase=storage -t [kasli, phaser, efc1v0, efc1v0]
 
     Note however that the latter deletes *all* config data, including ``ip``, ``rtio_clock``, et cetera. For Zynq-based cards, remove the ``eem_drtio_delay`` line from the SD card ``Config`` file directly.
