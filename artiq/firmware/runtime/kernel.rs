@@ -93,8 +93,7 @@ pub mod subkernel {
     use alloc::{collections::btree_map::BTreeMap, vec::Vec};
     use board_artiq::drtio_routing::RoutingTable;
     use board_misoc::clock;
-    use cslice::CSlice;
-    use eh::eh_artiq::Exception;
+    use eh::eh_artiq::{Exception, ExceptionStr};
     use io::{Cursor, ProtoRead};
     use proto_artiq::{
         drtioaux_proto::{PayloadStatus, MASTER_PAYLOAD_MAX_SIZE},
@@ -337,7 +336,7 @@ pub mod subkernel {
         } else {
             let pos = reader.position();
             let message_bytes = reader.get_ref().get(pos..(pos + len)).unwrap();
-            let s = str::from_utf8(message_bytes).unwrap();
+            let s = core::str::from_utf8(message_bytes).unwrap();
             Ok(ExceptionStr::from(s))
         }
     }
