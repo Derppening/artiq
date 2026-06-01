@@ -230,9 +230,9 @@ unsafe fn send_elements<W>(writer: &mut W, elt_tag: Tag, length: usize, data: *c
             writer.write_all(slice)?;
         },
         _ => {
-            let mut data = data;
-            for _ in 0..length {
-                send_value(writer, elt_tag, &mut data, write_tags)?;
+            let slice: &mut [*const ()] = slice::from_raw_parts_mut(data as *mut *const (), length);
+            for addr in slice.iter_mut() {
+                send_value(writer, elt_tag, addr, write_tags)?;
             }
         }
     }
