@@ -669,6 +669,7 @@ class BatchTest(ExperimentCase):
         self.assertLess(dt, 4*us)
 
 class CoredeviceTest(ExperimentCase):
+    @skip_if_no_opt
     def test_rtio_counter(self):
         self.execute(RTIOCounter)
         dt = self.dataset_mgr.get("dt")
@@ -1012,6 +1013,7 @@ class DMATest(ExperimentCase):
         else:
             self.assertLess(dt, 4.5*ms)
 
+    @skip_if_no_opt
     def test_dma_playback_rate(self):
         exp = self.create(_DMA)
         sequence_len = 128    # SED lane depth
