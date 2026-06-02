@@ -510,6 +510,7 @@
       kc705-hitl = pkgs.stdenvNoCC.mkDerivation {
         name = "kc705-hitl";
 
+        __networked = true; # compatibility with old patched Nix
         # breaks hydra, https://github.com/NixOS/hydra/issues/1216
         #__impure = true;     # Nix 2.8+
 
