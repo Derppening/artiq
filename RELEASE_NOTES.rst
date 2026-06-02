@@ -7,7 +7,9 @@ ARTIQ-10 (Unreleased)
 ---------------------
 
 * NAC3 compiler.
-* Multi-channel CoaXPress support.
+* CoaXPress grabber
+ - 1, 2 and 4 channels CoaXPress grabber support
+ - Maximum CoaXPress speed is now selectable with ``CXP-6``` being the new default (``CXP-12`` was the old default)
 * Conda packaging is no longer supported.
 * Novogorny (the ancestor of Sampler) is no longer supported.
 * The deprecated "base" field of JSON system descriptions has been removed. Use "drtio_role" instead.
