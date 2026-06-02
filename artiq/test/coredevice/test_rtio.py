@@ -460,8 +460,8 @@ class SequenceError(EnvExperiment, Generic[TTLOutCapable]):
         self.core.reset()
         self.core.delay(65.*256.*us)
         for _ in range(256):
-            self.ttl_out.pulse(25.*us)
-            self.core.delay(-75.*us)
+            self.ttl_out.pulse(1.*us)
+            self.core.delay(-2.*us)
 
 
 @compile
