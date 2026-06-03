@@ -312,7 +312,7 @@ class CXPGrabber:
         """
         Defines the coordinates of ROI viewer and start the capture.
 
-        Unlike :exc:`setup_roi`, ROI viewer has a maximum  height limit of 1024 and total size limit of 4096 pixels.
+        Unlike :exc:`setup_roi`, ROI viewer has a maximum size limit of 4096 pixels.
 
         .. warning:: This is NOT a real-time operation.
         """
@@ -340,10 +340,10 @@ class CXPGrabber:
             )
 
         for y in range(height):
-            offset = (((width + 3) & (~3)) // 4) * y
             for x in range(width):
+                pos = x + (y * width)
                 # each buffer element holds 4 pixels
                 frame[y][x] = int32(
-                    (buffer[offset + (x // 4)] >> (16 * (x % 4))) & int64(0xFFFF)
+                    (buffer[pos // 4] >> (16 * (pos % 4))) & int64(0xFFFF)
                 )
         return pixel_width
