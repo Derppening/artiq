@@ -16,6 +16,7 @@ AttributeError = builtins.AttributeError
 IndexError = builtins.IndexError
 IOError = builtins.IOError
 KeyError = builtins.KeyError
+MemoryError = builtins.MemoryError
 NotImplementedError = builtins.NotImplementedError
 OverflowError = builtins.OverflowError
 RuntimeError = builtins.RuntimeError

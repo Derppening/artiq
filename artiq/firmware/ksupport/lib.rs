@@ -129,10 +129,13 @@ fn heap_reset() {
 
 #[no_mangle]
 pub unsafe extern "C" fn malloc(size: usize) -> *mut u8 {
-    let layout = Layout::from_size_align(size, 8).unwrap();
+    let layout = match Layout::from_size_align(size, 8) {
+        Ok(l) => l,
+        Err(_) => raise!("MemoryError", "kernel CPU heap exhausted"),
+    };
     let ptr = core::alloc::GlobalAlloc::alloc(&ALLOC, layout);
     if ptr.is_null() {
-        panic!("kernel CPU heap exhausted (requested {:#x} bytes)", size);
+        raise!("MemoryError", "kernel CPU heap exhausted");
     }
     ptr
 }
