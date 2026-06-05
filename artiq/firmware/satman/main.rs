@@ -967,6 +967,11 @@ fn startup() {
             p3v3_fmc_en_pin = 1;
             vadj_fmc_en_pin = 7;
         }
+        #[cfg(hw_rev = "v1.2")]
+        {
+            p3v3_fmc_en_pin = 0;
+            vadj_fmc_en_pin = 7;
+        }
 
         io_expander = board_misoc::io_expander::IoExpander::new().unwrap();
         io_expander.init().expect("I2C I/O expander initialization failed");
@@ -1155,6 +1160,11 @@ fn enable_error_led() {
     #[cfg(hw_rev = "v1.1")]
     {
         p3v3_fmc_en_pin = 1;
+        vadj_fmc_en_pin = 7;
+    }
+    #[cfg(hw_rev = "v1.2")]
+    {
+        p3v3_fmc_en_pin = 0;
         vadj_fmc_en_pin = 7;
     }
 

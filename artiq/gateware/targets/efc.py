@@ -347,7 +347,7 @@ def main():
         description="ARTIQ device binary builder for EEM FMC Carrier systems")
     builder_args(parser)
     parser.set_defaults(output_dir="artiq_efc")
-    parser.add_argument("--efc-hw-rev", choices=["v1.0", "v1.1"], default="v1.1",
+    parser.add_argument("--efc-hw-rev", choices=["v1.0", "v1.1", "v1.2"], default="v1.1",
                         help="EFC hardware revision")
     parser.add_argument("--gateware-identifier-str", default=None,
                         help="Override ROM identifier")

@@ -772,7 +772,7 @@
                         },
                         "hw_rev": {
                             "type": "string",
-                            "enum": ["v1.0", "v1.1"]
+                            "enum": ["v1.0", "v1.1", "v1.2"]
                         }
                     },
                     "required": ["ports"]
@@ -807,7 +807,7 @@
                         },
                         "hw_rev": {
                             "type": "string",
-                            "enum": ["v1.0", "v1.1"]
+                            "enum": ["v1.0", "v1.1", "v1.2"]
                         }
                     },
                     "required": ["ports"]
