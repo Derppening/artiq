@@ -119,11 +119,18 @@ mod cxp;
 static mut LIBRARY: Option<Library<'static>> = None;
 static mut ALLOC: alloc_list::ListAlloc = alloc_list::EMPTY;
 
+extern "C" {
+    static __kernel_stack_start: usize;
+    static __kernel_heap_start: usize;
+    static __kernel_heap_end: usize;
+}
+
 fn heap_reset() {
     unsafe {
         ALLOC = alloc_list::EMPTY;
-        ALLOC.add(kernel_proto::KERNELCPU_HEAP_ADDRESS as *mut u8,
-                  kernel_proto::KERNELCPU_HEAP_SIZE);
+        let start = &__kernel_heap_start as *const _ as *mut u8;
+        let end = &__kernel_heap_end as *const _ as *mut u8;
+        ALLOC.add_range(start, end);
     }
 }
 
@@ -670,7 +677,7 @@ static mut STACK_GUARD_BASE: usize = 0x0;
 pub unsafe fn main() {
     eh_artiq::reset_exception_buffer(KERNELCPU_PAYLOAD_ADDRESS);
     let image = slice::from_raw_parts_mut(kernel_proto::KERNELCPU_PAYLOAD_ADDRESS as *mut u8,
-                                          kernel_proto::KERNELCPU_HEAP_ADDRESS -
+                                          &__kernel_stack_start as *const _ as usize -
                                           kernel_proto::KERNELCPU_PAYLOAD_ADDRESS);
 
     let library = recv!(&LoadRequest(library) => {
