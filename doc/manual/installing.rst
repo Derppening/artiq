@@ -1,7 +1,13 @@
 Installing ARTIQ
 ================
 
-ARTIQ can be installed using the Nix package manager on Linux, and using the MSYS2 software distribution on Windows.
+The supported operating systems and ways to install ARTIQ are:
+
+  * Linux, using the Nix package manager
+  * Windows, using the MSYS2 software distribution
+  * OpenBSD, using the native ports system
+
+However, ARTIQ is designed with portability in mind, and the community has found other ways to install all or parts of ARTIQ on other systems, for example on macOS or WSL. Search the forum for details. This manual describes the supported ways.
 
 Installing via Nix (Linux)
 --------------------------
@@ -196,6 +202,11 @@ As above in the Nix section, you may find yourself wanting to add other useful p
 
 For more see the `MSYS2 documentation <https://www.msys2.org/docs/package-management/>`_ on package management. If your favorite package is not available with MSYS2, contact M-Labs using the helpdesk@ email.
 
+Installing on OpenBSD
+---------------------
+
+See the `M-Labs OpenBSD ports repository <https://git.m-labs.hk/M-Labs/openbsd-ports>`_ and follow the instructions there to install the ``misc/artiq`` port.
+
 .. _installing-upgrading:
 
 Upgrading ARTIQ
@@ -217,4 +228,3 @@ Upgrading with MSYS2
 Run ``pacman -Syu`` to update all MSYS2 packages, including ARTIQ. If you get a message telling you that the shell session must be restarted after a partial update, open the shell again after the partial update and repeat the command. See the `MSYS2 <https://www.msys2.org/docs/updating/>`__ and `Pacman <https://wiki.archlinux.org/title/Pacman>`_ manuals for more information, including how to update individual packages if required.
 
 You may need to reflash the gateware and firmware of the core device to keep it synchronized with the software.
-
