@@ -106,7 +106,7 @@ The resulting shell will have access to ARTIQ as well as any additional packages
 
 You might be interested in creating multiple directories containing separate ``flake.nix`` files to represent different sets of packages for different purposes.
 
-To find more packages you can browse the `Nix package search <https://search.nixos.org/packages>`_ website. If your favorite package is not available with Nix, contact M-Labs using the helpdesk@ email.
+To find more packages you can browse the `Nix package search <https://search.nixos.org/packages>`_ website. If your favorite package is not available with Nix, contact M-Labs by email at helpdesk@m-labs.hk.
 
 .. note::
 
@@ -200,7 +200,7 @@ As above in the Nix section, you may find yourself wanting to add other useful p
 
   $ pacman -S <package name>
 
-For more see the `MSYS2 documentation <https://www.msys2.org/docs/package-management/>`_ on package management. If your favorite package is not available with MSYS2, contact M-Labs using the helpdesk@ email.
+For more see the `MSYS2 documentation <https://www.msys2.org/docs/package-management/>`_ on package management. If your favorite package is not available with MSYS2, contact M-Labs by email at helpdesk@m-labs.hk.
 
 Installing on OpenBSD
 ---------------------

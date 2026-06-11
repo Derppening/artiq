@@ -328,12 +328,14 @@ For more advanced questions, sometimes the `list of publications <https://m-labs
 "Help, I've done my best and I can't get any further!"
 ------------------------------------------------------
 
-- If you have an active M-Labs AFWS/support subscription, you can email helpdesk@ at any time for personalized assistance. Please include the following information:
+- If you have an active M-Labs AFWS/support subscription, you can email helpdesk@m-labs.hk at any time for personalized assistance. Please include the following information:
 
     - Your installed ARTIQ version (add ``--version`` to any of the standard ARTIQ commands)
     - The variant name of your system (refer to the sticker on the crate if you aren't sure)
     - The recent output of your core log, either through ``artiq_coremgmt`` (if you're able to contact your device by network), or over UART following :ref:`the guide here <connecting-UART>`
     - How your problem happened, and what you've already tried to fix it
+
+You should receive an immediate confirmation with a ticket number after sending your helpdesk email. If not, the most likely cause is your organization's email system blocks emails to and/or from Hong Kong. To work around this problem, write to helpdesk@m-labs-intl.com instead.
 
 - Compare your materials with the examples; see also :ref:`finding ARTIQ examples <faq-find-examples>` above.
 - Check the list of `active issues <https://git.m-labs.hk/M-Labs/artiq/issues>`_ on the ARTIQ Gitea repository for possible known problems with ARTIQ. Search through the closed issues to see if your question or concern has been addressed before.

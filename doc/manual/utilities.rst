@@ -23,7 +23,7 @@ This tool serves as a client for building tailored firmware and gateware from M-
 
    passwd
       .. warning::
-         After receiving your credentials from M-Labs, it is recommended to change your password as soon as possible. It is your responsibility to set and remember a secure password. If necessary, passwords can be reset by contacting helpdesk@.
+         After receiving your credentials from M-Labs, it is recommended to change your password as soon as possible. It is your responsibility to set and remember a secure password. If necessary, passwords can be reset by contacting helpdesk@m-labs.hk.
 
 Static compiler
 ---------------
