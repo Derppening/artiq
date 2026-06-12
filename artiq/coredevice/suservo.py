@@ -7,6 +7,7 @@ from typing import Generic
 from artiq.language.core import *
 from artiq.language.units import us, ns
 from artiq.coredevice.core import Core
+from artiq.coredevice.kasli_i2c import KasliEEPROM
 from artiq.coredevice.rtio import rtio_output, rtio_input_data
 from artiq.coredevice.spi2 import SPI_END, SPIMaster
 from artiq.coredevice.urukul import CFG_MASK_NU, CPLD, ProtoRev9, RegIOUpdate
@@ -845,7 +846,12 @@ class _MaskedIOUpdate:
             self.aligned_write_cfg_mask_nu(True)
 
 
+@compile
 class SyncDataUser:
+    core: Core
+    sync_delay_seeds: Kernel[list[int32]]
+    io_update_delay: Kernel[int32]
+
     def __init__(self, core, sync_delay_seeds, io_update_delay):
         self.core = core
         self.sync_delay_seeds = sync_delay_seeds
@@ -856,7 +862,14 @@ class SyncDataUser:
         pass
 
 
+@compile
 class SyncDataEeprom:
+    core: Core
+    eeprom_device: KernelInvariant[KasliEEPROM]
+    eeprom_offset: KernelInvariant[int32]
+    sync_delay_seeds: Kernel[list[int32]]
+    io_update_delay: Kernel[int32]
+
     def __init__(self, dmgr, core, eeprom_str):
         self.core = core
 
@@ -912,6 +925,8 @@ class SharedDDS(Generic[IoUpdateT]):
     core: KernelInvariant[Core]
     cpld: KernelInvariant[CPLD[Auto]]
     _inner_dds: KernelInvariant[AD9910[IoUpdateT]]
+    selected_ch: Kernel[int32]
+    sync_data: KernelInvariant[SyncDataUser]
 
     def __init__(self, dmgr, cpld_device,
                  pll_cp=7, pll_vco=5, sync_delay_seeds=[-1, -1, -1, -1],
