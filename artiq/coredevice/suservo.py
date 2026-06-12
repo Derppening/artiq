@@ -10,6 +10,7 @@ from artiq.coredevice.core import Core
 from artiq.coredevice.kasli_i2c import KasliEEPROM
 from artiq.coredevice.rtio import rtio_output, rtio_input_data
 from artiq.coredevice.spi2 import SPI_END, SPIMaster
+from artiq.coredevice import ad9910, urukul, sampler
 from artiq.coredevice.urukul import CFG_MASK_NU, CPLD, ProtoRev9, RegIOUpdate
 from artiq.coredevice.ad9910 import AD9910, STA_PROTO_REV_9, IoUpdateT
 from artiq.coredevice.sampler import adc_mu_to_volt as sampler_adc_mu_to_volt, SPI_CONFIG as SAMPLER_SPI_CONFIG, SPI_CS_PGIA as SAMPLER_SPI_CS_PGIA
@@ -394,8 +395,8 @@ class Channel(Generic[IoUpdateT]):
         :param fiducial_mu: Fiducial time stamp in machine unit
         """
         addr = self.servo.phase_sel | (((self.servo_channel << PROFILE_WIDTH) | profile) << 1)
-        self.servo.write(addr, int32(fiducial_mu & 0xffff))
-        self.servo.write(addr + 1, int32(fiducial_mu >> 16))
+        self.servo.write(addr, int32(fiducial_mu) & 0xffff)
+        self.servo.write(addr + 1, int32(fiducial_mu) >> 16)
 
     @kernel
     def copy_reference_time(self, profile: int32):
@@ -1027,14 +1028,14 @@ class SharedDDS(Generic[IoUpdateT]):
                 t = 0
                 # check whether the sync edge is strictly between i, i+2
                 for j in range(repeat):
-                    t += self._inner_dds.measure_io_update_alignment(int64(i), i + 2)
+                    t += self._inner_dds.measure_io_update_alignment(int64(i), int64(i + 2))
                 if t != 0:  # no certain edge
                     continue
                 # check left/right half: i,i+1 and i+1,i+2
                 t1 = [0, 0]
                 for j in range(repeat):
-                    t1[0] += self._inner_dds.measure_io_update_alignment(int64(i), i + 1)
-                    t1[1] += self._inner_dds.measure_io_update_alignment(int64(i + 1), i + 2)
+                    t1[0] += self._inner_dds.measure_io_update_alignment(int64(i), int64(i + 1))
+                    t1[1] += self._inner_dds.measure_io_update_alignment(int64(i + 1), int64(i + 2))
                 if ((t1[0] == 0 and t1[1] == 0) or
                         (t1[0] == repeat and t1[1] == repeat)):
                     # edge is not close to i + 1, can't interpret result
