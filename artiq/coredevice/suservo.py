@@ -75,7 +75,7 @@ class SUServo(Generic[IoUpdateT]):
     core: KernelInvariant[Core]
     pgia: KernelInvariant[SPIMaster]
     ddses: KernelInvariant[list[SharedDDS[IoUpdateT]]]
-    cplds: KernelInvariant[list[CPLD[IoUpdateT]]]
+    cplds: KernelInvariant[list[CPLD[Auto]]]
     channel: KernelInvariant[int32]
     gains: Kernel[int32]
     ref_period_mu: KernelInvariant[int64]
@@ -338,7 +338,7 @@ class Channel(Generic[IoUpdateT]):
     servo: KernelInvariant[SUServo[IoUpdateT]]
     channel: KernelInvariant[int32]
     servo_channel: KernelInvariant[int32]
-    dds: KernelInvariant[AD9910[Auto]]
+    dds: KernelInvariant[AD9910[IoUpdateT]]
 
     def __init__(self, dmgr, channel, servo_device):
         self.servo = dmgr.get(servo_device)
@@ -910,7 +910,7 @@ class SharedDDS(Generic[IoUpdateT]):
     :param core_device: Core device name
     """
     core: KernelInvariant[Core]
-    cpld: KernelInvariant[CPLD[IoUpdateT]]
+    cpld: KernelInvariant[CPLD[Auto]]
     _inner_dds: KernelInvariant[AD9910[IoUpdateT]]
 
     def __init__(self, dmgr, cpld_device,
