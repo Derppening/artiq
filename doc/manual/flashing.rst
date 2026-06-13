@@ -77,7 +77,6 @@ Writing the flash
 If your device is already accessible over the network, all you need is an Ethernet connection and a correct IP address (supplied either with the ``-D`` option or in :ref:`your device database <device-db>`). ::
 
     $ artiq_coremgmt [-D IP_address] flash <afws_directory>
-    $ artiq_coremgmt [-D IP_address] reboot
 
 If the device is not reachable due to corrupted firmware or networking problems, binaries can be loaded manually. On Kasli or KC705, connect the board directly to your computer by JTAG USB and use :mod:`~artiq.frontend.artiq_flash`, as follows: ::
 
