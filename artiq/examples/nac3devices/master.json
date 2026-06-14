@@ -4,7 +4,7 @@
     "variant": "nac3devices_master",
     "hw_rev": "v1.1",
     "drtio_role": "master",
-    "core_addr": "192.168.1.70",
+    "core_addr": "kasli.hkg.mlsi",
     "peripherals": [
         {
             "type": "zotino",

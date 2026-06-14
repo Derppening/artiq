@@ -533,7 +533,7 @@
           mkdir $HOME/.ssh
           cp /opt/hydra_id_ed25519 $HOME/.ssh/id_ed25519
           cp /opt/hydra_id_ed25519.pub $HOME/.ssh/id_ed25519.pub
-          echo "rpi-1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILd51cZEV8N2V+2+GQms6ombHqmsReBWrQfQFnOyLKrO" > $HOME/.ssh/known_hosts
+          echo "rpi-1.hkg.mlsi ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILd51cZEV8N2V+2+GQms6ombHqmsReBWrQfQFnOyLKrO" > $HOME/.ssh/known_hosts
           chmod 600 $HOME/.ssh/id_ed25519
           LOCKCTL=$(mktemp -d)
           mkfifo $LOCKCTL/lockctl
@@ -541,7 +541,7 @@
           cat $LOCKCTL/lockctl | ${pkgs.openssh}/bin/ssh \
             -i $HOME/.ssh/id_ed25519 \
             -o UserKnownHostsFile=$HOME/.ssh/known_hosts \
-            rpi-1 \
+            rpi-1.hkg.mlsi \
             'mkdir -p /tmp/board_lock && flock /tmp/board_lock/kc705-1 -c "echo Ok; cat"' \
           | (
             # End remote flock via FIFO
@@ -558,8 +558,8 @@
 
             artiq_rtiomap --device-db $ARTIQ_ROOT/device_db.py device_map.bin
             artiq_mkfs -s ip `python -c "import artiq.examples.kc705_nist_clock.device_db as ddb; print(ddb.core_addr)"`/24 -f device_map device_map.bin kc705_nist_clock.config
-            artiq_flash write=storage -t kc705 -H rpi-1 -f kc705_nist_clock.config
-            artiq_flash -t kc705 -H rpi-1 -d ${packages.x86_64-linux.artiq-board-kc705-nist_clock}
+            artiq_flash write=storage -t kc705 -H rpi-1.hkg.mlsi -f kc705_nist_clock.config
+            artiq_flash -t kc705 -H rpi-1.hkg.mlsi -d ${packages.x86_64-linux.artiq-board-kc705-nist_clock}
             sleep 30
 
             python -m unittest discover -v artiq.test.coredevice
