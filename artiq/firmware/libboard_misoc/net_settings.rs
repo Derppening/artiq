@@ -91,7 +91,7 @@ pub fn get_addresses() -> NetAddresses {
         _ => Ipv4AddrConfig::UseDhcp,
     };
 
-    let ipv4_default_route = match config::read_str("ipv4_default_route", |r| r.map(|s| s.parse())) {
+    let ipv4_default_route = match config::read_str("ip_default_route", |r| r.map(|s| s.parse())) {
         Ok(Ok(addr)) => Some(addr),
         _ => None,
     };
@@ -108,7 +108,7 @@ pub fn get_addresses() -> NetAddresses {
         _ => None
     };
 
-    let ipv6_default_route = match config::read_str("ipv6_default_route", |r| r.map(|s| s.parse())) {
+    let ipv6_default_route = match config::read_str("ip6_default_route", |r| r.map(|s| s.parse())) {
         Ok(Ok(addr)) => Some(addr),
         _ => None,
     };
