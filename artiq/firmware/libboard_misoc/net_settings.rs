@@ -50,12 +50,20 @@ pub struct NetAddresses {
 
 impl Display for NetAddresses {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "MAC={} IPv4={} IPv6-LL={} IPv6=",
-            self.hardware_addr, self.ipv4_addr, self.ipv6_ll_addr)?;
+        write!(f, "MAC={} IPv4={} ", self.hardware_addr, self.ipv4_addr)?;
+        match self.ipv4_default_route {
+            Some(addr) => write!(f, "IPv4-default-route={} ", addr)?,
+            None => write!(f, "IPv4-default-route=no configured address ")?,
+        };
+        write!(f, "IPv6-LL={} ", self.ipv6_ll_addr)?;
         match self.ipv6_addr {
-            Some(addr) => write!(f, "{}", addr)?,
-            None => write!(f, "no configured address")?
-        }
+            Some(addr) => write!(f, "IPv6={} ", addr)?,
+            None => write!(f, "IPv6=no configured address ")?,
+        };
+        match self.ipv6_default_route {
+            Some(addr) => write!(f, "IPv6-default-route={} ", addr)?,
+            None => write!(f, "IPv6-default-route=no configured address ")?,
+        };
         Ok(())
     }
 }
