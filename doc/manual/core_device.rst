@@ -20,11 +20,11 @@ The core device reserves some storage space (either flash or directly on SD card
   Sets IP address of core device. For this and other networking options see also :ref:`core-device-networking`.
 ``mac``
   Sets MAC address of core device. Unnecessary on Kasli or Kasli-SoC, which can obtain it from EEPROM.
-``ipv4_default_route``
+``ip_default_route``
   Sets IPv4 default route.
 ``ip6``
   Sets IPv6 address of core device. Can be set irrespective of and used simultaneously as IPv4 address above.
-``ipv6_default_route``
+``ip6_default_route``
   Sets IPv6 default route.
 ``sed_spread_enable``
   If set to ``1``, will activate :ref:`sed-event-spreading` in this core device. Needs to be set separately for satellite devices in a DRTIO setting.
