@@ -168,7 +168,7 @@ fn startup() {
 
     let neighbor_cache =
         smoltcp::iface::NeighborCache::new(alloc::collections::btree_map::BTreeMap::new());
-    let net_addresses = net_settings::get_adresses();
+    let net_addresses = net_settings::get_addresses();
     info!("network addresses: {}", net_addresses);
     let use_dhcp = if matches!(net_addresses.ipv4_addr, Ipv4AddrConfig::UseDhcp) {
         info!("will try to acquire an IPv4 address with DHCP");

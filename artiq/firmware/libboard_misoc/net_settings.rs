@@ -60,7 +60,7 @@ impl fmt::Display for NetAddresses {
     }
 }
 
-pub fn get_adresses() -> NetAddresses {
+pub fn get_addresses() -> NetAddresses {
     let hardware_addr;
     match config::read_str("mac", |r| r.map(|s| s.parse())) {
         Ok(Ok(addr)) => hardware_addr = addr,

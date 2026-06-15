@@ -409,7 +409,7 @@ fn network_boot() {
     let mut neighbor_map = [None; 2];
     let neighbor_cache =
         smoltcp::iface::NeighborCache::new(&mut neighbor_map[..]);
-    let net_addresses = net_settings::get_adresses();
+    let net_addresses = net_settings::get_addresses();
     println!("Network addresses: {}", net_addresses);
     let mut ip_addrs = [
         IpCidr::new(IpAddress::Ipv4(Ipv4Address::UNSPECIFIED), 0),
