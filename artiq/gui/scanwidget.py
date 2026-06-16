@@ -149,11 +149,11 @@ class ScanWidget(QtWidgets.QWidget):
             self.setStop(self._start)
         elif ev.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier:
             self._drag = "zoom"
-            self._offset = QtCore.QPoint(ev.position().x(), 0)
+            self._offset = QtCore.QPoint(int(ev.position().x()), 0)
             self._rubber = QtWidgets.QRubberBand(
-                QtWidgets.QRubberBand.Rectangle, self)
+                QtWidgets.QRubberBand.Shape.Rectangle, self)
             self._rubber.setGeometry(QtCore.QRect(
-                self._offset, QtCore.QPoint(ev.position().x(), self.height() - 1)))
+                self._offset, QtCore.QPoint(int(ev.position().x()), int(self.height() - 1))))
             self._rubber.show()
         else:
             qfm = QtGui.QFontMetrics(self.font())
@@ -182,7 +182,7 @@ class ScanWidget(QtWidgets.QWidget):
             self.setStop(self._pixelToAxis(ev.position().x()))
         elif self._drag == "zoom":
             self._rubber.setGeometry(QtCore.QRect(
-                self._offset, QtCore.QPoint(ev.position().x(), self.height() - 1)
+                self._offset, QtCore.QPoint(int(ev.position().x()), int(self.height() - 1))
             ).normalized())
         elif self._drag == "axis":
             self._setView(ev.position().x() - self._offset, self._axisView[1])
