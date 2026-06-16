@@ -35,7 +35,7 @@ class AD9912:
     pll_en: KernelInvariant[bool]
     ftw_per_hz: KernelInvariant[float]
     sw: KernelInvariant[Option[TTLOut]]
-    io_update: KernelInvariant[TTLOut]
+    io_update: KernelInvariant[IOUpdate]
 
     def __init__(self, dmgr, chip_select, cpld_device, sw_device=None,
                  pll_en=True):
@@ -68,10 +68,7 @@ class AD9912:
         assert sysclk <= 1e9
         self.ftw_per_hz = 1 / sysclk * (1 << 48)
 
-        if not self.cpld.io_update:
-            self.io_update = urukul.RegIOUpdate(self.cpld, self.chip_select)
-        else:
-            self.io_update = self.cpld.io_update
+        self.io_update = IOUpdate(self.cpld, self.chip_select)
 
     @kernel
     def write(self, addr: int32, data: int32, length: int32):

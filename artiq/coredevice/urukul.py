@@ -106,41 +106,127 @@ def urukul_sta_drover(sta: int32) -> int32:
 
 
 @compile
-class RegIOUpdate:
+class IOUpdate:
     cpld: KernelInvariant[CPLD[Auto]]
-    chip_select: KernelInvariant[int32]
+    chip_select: Kernel[int32]
+    mask_nu_offset: KernelInvariant[Option[int32]]
 
-    def __init__(self, cpld, chip_select):
+    def __init__(self, cpld, chip_select, use_mask_nu=False):
         self.cpld = cpld
         self.chip_select = chip_select
 
+        # Synchronized SU-Servo uses the designated I/O update pin.
+        # When communicating with the DDS via slow SPI, MASK_NU must be set to
+        # perform serial transfer, then unset to propagate I/O update.
+        if use_mask_nu:
+            self.mask_nu_offset = Some(cpld.version.CFG_MASK_NU)
+        else:
+            self.mask_nu_offset = none
+
     @kernel
-    def pulse_mu(self, duration: int64):
-        """Pulse the output high for the specified duration
-        (in machine units).
+    def get_mask_nu(self) -> int32:
+        return int32(self.cpld.cfg_reg >> self.mask_nu_offset.unwrap()) & 0xF
+
+    @kernel
+    def aligned_write_cfg_mask_nu(self, state: int32):
+        """Write NU_MASK of CFG at a coarse RTIO clock cycle.
+
+        It aligns the time cursor to the next coarse time stamp, write NU_MASK
+        to the Urukul CFG, then restore the initial fine time stamp.
+
+        This method advances the time cursor by a CFG write duration, plus 1
+        RTIO clock cycle."""
+        fine_ts = now_mu() & int64(self.cpld.core.ref_multiplier - 1)
+        delay_mu(int64(self.cpld.core.ref_multiplier) - fine_ts)
+        self.cpld.cfg_mask_nu_all(state)
+        delay_mu(fine_ts)
+
+    @kernel
+    def pulse_io_update_mu(self, duration: int64):
+        """Emit I/O Update pulse for the specified duration
+        (in machine units). I/O Update pulse is a TTL pulse if supplied, SPI-
+        driven writes to the CFG otherwise.
 
         The time cursor is advanced by the specified duration."""
-        cfg = self.cpld.cfg_reg
-        if self.chip_select == 3:
-            self.cpld.cfg_io_update_all(0xF)
+        if self.cpld.io_update.is_some():
+            self.cpld.io_update.unwrap().pulse_mu(duration)
         else:
-            self.cpld.cfg_io_update(self.chip_select & 0x3, True)
-        delay_mu(duration)
-        self.cpld.cfg_write(cfg)
+            cfg = self.cpld.cfg_reg
+            if self.chip_select == CS_DDS_MULTI:
+                self.cpld.cfg_io_update_all(0xF)
+            else:
+                self.cpld.cfg_io_update(self.chip_select & 0x3, True)
+            delay_mu(duration)
+            self.cpld.cfg_write(cfg)
+
+    @kernel
+    def pulse_io_update(self, duration: float):
+        """Emit I/O Update pulse for the specified duration (in seconds).
+        I/O Update pulse is a TTL pulse if supplied, SPI-driven writes to the
+        CFG otherwise.
+        
+        The time cursor is advanced by the specified duration."""
+        if self.cpld.io_update.is_some():
+            self.cpld.io_update.unwrap().pulse(duration)
+        else:
+            cfg = self.cpld.cfg_reg
+            if self.chip_select == CS_DDS_MULTI:
+                self.cpld.cfg_io_update_all(0xF)
+            else:
+                self.cpld.cfg_io_update(self.chip_select & 0x3, True)
+            self.cpld.core.delay(duration)
+            self.cpld.cfg_write(cfg)
+
+    @kernel
+    def pulse_mu(self, duration: int64):
+        """Unset MASK_NU, then pulse the IO Update TTL high for the specified
+        duration (in machine units). MASK_NU is restored to the previous value
+        after the I/O pulse.
+
+        The I/O update TTL supports fine time stamp. Controlling I/O update
+        through TTL requires Urukul CFG writes, but CFG writes does not
+        support fine time stamps.
+
+        Hence, a pair of preamble and postamble CFG writes (with coarse clock
+        alignments) are issued to enable I/O updates from TTL temporarily.
+        ``aligned_write_cfg_mask_nu`` implements the preamble/postamble writes.
+
+        The time cursor is advanced by the sum of:
+        - 2 CFG writes (enable/disable MASK_NU)
+        - 2 coarse RTIO cycles (coarse clock alignment), and
+        - I/O update pulse duration"""
+        init_mask_nu = 0
+        if self.mask_nu_offset.is_some():
+            init_mask_nu = self.get_mask_nu()
+            if self.chip_select == CS_DDS_MULTI:
+                mask_nu = 0
+            else:
+                mask_nu = (1 << (self.chip_select - 4)) & init_mask_nu
+            self.aligned_write_cfg_mask_nu(mask_nu)
+
+        self.pulse_io_update_mu(duration)
+
+        if self.mask_nu_offset.is_some():
+            self.aligned_write_cfg_mask_nu(init_mask_nu)
 
     @kernel
     def pulse(self, duration: float):
-        """Pulse the output high for the specified duration
-        (in seconds).
+        """Pulse the output high for the specified duration (in seconds).
 
-        The time cursor is advanced by the specified duration."""
-        cfg = self.cpld.cfg_reg
-        if self.chip_select == 3:
-            self.cpld.cfg_io_update_all(0xF)
-        else:
-            self.cpld.cfg_io_update(self.chip_select & 0x3, True)
-        self.cpld.core.delay(duration)
-        self.cpld.cfg_write(cfg)
+        See pulse_mu."""
+        init_mask_nu = 0
+        if self.mask_nu_offset.is_some():
+            init_mask_nu = self.get_mask_nu()
+            if self.chip_select == CS_DDS_MULTI:
+                mask_nu = 0
+            else:
+                mask_nu = (1 << (self.chip_select - 4)) & init_mask_nu
+            self.aligned_write_cfg_mask_nu(mask_nu)
+
+        self.pulse_io_update(duration)
+
+        if self.mask_nu_offset.is_some():
+            self.aligned_write_cfg_mask_nu(init_mask_nu)
 
 
 @compile
@@ -782,7 +868,7 @@ class CPLD(Generic[V]):
     core: KernelInvariant[Core]
     refclk: KernelInvariant[float]
     bus: KernelInvariant[SPIMaster]
-    io_update: KernelInvariant[TTLOut]  # https://git.m-labs.hk/M-Labs/nac3/issues/664
+    io_update: KernelInvariant[Option[TTLOut]]
     clk_div: KernelInvariant[int32]
     dds_reset: KernelInvariant[Option[TTLOut]]
     sync: KernelInvariant[Option[TTLClockGen]]
@@ -816,9 +902,9 @@ class CPLD(Generic[V]):
 
         self.bus = dmgr.get(spi_device)
         if io_update_device is not None:
-            self.io_update = dmgr.get(io_update_device)
+            self.io_update = Some(dmgr.get(io_update_device))
         else:
-            self.io_update = io_update_device
+            self.io_update = none
         if dds_reset_device is not None:
             self.dds_reset = Some(dmgr.get(dds_reset_device))
         else:

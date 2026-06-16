@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from math import ceil, log2
 from numpy import int32, int64
-from typing import Generic
+from typing import Generic, TypeVar
 
 from artiq.language.core import *
 from artiq.language.units import us, ns
@@ -11,8 +11,9 @@ from artiq.coredevice.kasli_i2c import KasliEEPROM
 from artiq.coredevice.rtio import rtio_output, rtio_input_data
 from artiq.coredevice.spi2 import SPI_END, SPIMaster
 from artiq.coredevice import ad9910, urukul, sampler
-from artiq.coredevice.urukul import CFG_MASK_NU, CPLD, ProtoRev9, RegIOUpdate
-from artiq.coredevice.ad9910 import AD9910, STA_PROTO_REV_9, IoUpdateT
+from artiq.coredevice.ttl import TTLOut
+from artiq.coredevice.urukul import CPLD
+from artiq.coredevice.ad9910 import AD9910, STA_PROTO_REV_9
 from artiq.coredevice.sampler import adc_mu_to_volt as sampler_adc_mu_to_volt, SPI_CONFIG as SAMPLER_SPI_CONFIG, SPI_CS_PGIA as SAMPLER_SPI_CS_PGIA
 
 
@@ -39,7 +40,7 @@ def adc_mu_to_volts(x: int32, gain: int32, corrected_fs: bool = True) -> float:
 
 
 @compile
-class SUServo(Generic[IoUpdateT]):
+class SUServo:
     """Sampler-Urukul Servo parent and configuration device.
 
     Sampler-Urukul Servo is a integrated device controlling one
@@ -76,7 +77,7 @@ class SUServo(Generic[IoUpdateT]):
 
     core: KernelInvariant[Core]
     pgia: KernelInvariant[SPIMaster]
-    ddses: KernelInvariant[list[SharedDDS[IoUpdateT]]]
+    ddses: KernelInvariant[list[SharedDDS]]
     cplds: KernelInvariant[list[CPLD[Auto]]]
     channel: KernelInvariant[int32]
     gains: Kernel[int32]
@@ -329,7 +330,7 @@ class SUServo(Generic[IoUpdateT]):
 
 
 @compile
-class Channel(Generic[IoUpdateT]):
+class Channel:
     """Sampler-Urukul Servo channel
 
     :param channel: RTIO channel number
@@ -337,10 +338,10 @@ class Channel(Generic[IoUpdateT]):
     """
 
     core: KernelInvariant[Core]
-    servo: KernelInvariant[SUServo[IoUpdateT]]
+    servo: KernelInvariant[SUServo]
     channel: KernelInvariant[int32]
     servo_channel: KernelInvariant[int32]
-    dds: KernelInvariant[AD9910[IoUpdateT]]
+    dds: KernelInvariant[SharedDDS]
 
     def __init__(self, dmgr, channel, servo_device):
         self.servo = dmgr.get(servo_device)
@@ -779,74 +780,6 @@ class Channel(Generic[IoUpdateT]):
         return y_mu
 
 
-class _MaskedIOUpdate:
-    def __init__(self, core, cpld, dds, io_update):
-        self.cpld = cpld
-        self.dds = dds
-        self.core = core
-        self.io_update = io_update
-
-        # Synchronized SU-Servo uses the designated I/O update pin.
-        # When communicating with the DDS via slow SPI, MASK_NU must be set to
-        # perform serial transfer, then unset to propagate I/O update.
-        self.toggle_mask_nu = self.cpld.io_update is not None
-    
-    @kernel
-    def aligned_write_cfg_mask_nu(self, state):
-        """Write NU_MASK of CFG at a coarse RTIO clock cycle.
-
-        It aligns the time cursor to the next coarse time stamp, write NU_MASK
-        to the Urukul CFG, then restore the initial fine time stamp.
-
-        This method advances the time cursor by a CFG write duration, plus 1
-        RTIO clock cycle."""
-        fine_ts = now_mu() & (self.core.ref_multiplier - 1)
-        delay_mu(self.core.ref_multiplier - fine_ts)
-        self.cpld.cfg_mask_nu(self.dds.selected_ch, state)
-        delay_mu(fine_ts)
-
-    @kernel
-    def pulse_mu(self, duration):
-        """Unset MASK_NU, then pulse the IO Update TTL high for the specified
-        duration (in machine units). MASK_NU is restored to the previous value
-        after the I/O pulse.
-
-        The I/O update TTL supports fine time stamp. Controlling I/O update
-        through TTL requires Urukul CFG writes, but CFG writes does not
-        support fine time stamps.
-
-        Hence, a pair of preamble and postamble CFG writes (with coarse clock
-        alignments) are issued to enable I/O updates from TTL temporarily.
-        ``aligned_write_cfg_mask_nu`` implements the preamble/postamble writes.
-
-        The time cursor is advanced by the sum of:
-        - 2 CFG writes (enable/disable MASK_NU)
-        - 2 coarse RTIO cycles (coarse clock alignment), and
-        - I/O update pulse duration"""
-        toggle_needed = bool((self.cpld.cfg_reg >> (urukul.ProtoRev9.CFG_MASK_NU + self.dds.selected_ch)) & 1)
-        if self.toggle_mask_nu and toggle_needed:
-            self.aligned_write_cfg_mask_nu(False)
-
-        self.io_update.pulse_mu(duration)
-
-        if self.toggle_mask_nu and toggle_needed:
-            self.aligned_write_cfg_mask_nu(True)
-
-    @kernel
-    def pulse(self, duration):
-        """Pulse the output high for the specified duration (in seconds).
-
-        See pulse_mu."""
-        toggle_needed = bool((self.cpld.cfg_reg >> (urukul.ProtoRev9.CFG_MASK_NU + self.dds.selected_ch)) & 1)
-        if self.toggle_mask_nu and toggle_needed:
-            self.aligned_write_cfg_mask_nu(False)
-
-        self.io_update.pulse(duration)
-
-        if self.toggle_mask_nu and toggle_needed:
-            self.aligned_write_cfg_mask_nu(True)
-
-
 @compile
 class SyncDataUser:
     core: Core
@@ -893,7 +826,7 @@ class SyncDataEeprom:
             self.io_update_delay = int32(io_update_delay)
 
 @compile
-class SharedDDS(Generic[IoUpdateT]):
+class SharedDDS:
     """DDS configuration device for SU-Servo.
 
     Shared DDS device controls all 4 DDSes on the same Urukul device. Control
@@ -925,8 +858,7 @@ class SharedDDS(Generic[IoUpdateT]):
     """
     core: KernelInvariant[Core]
     cpld: KernelInvariant[CPLD[Auto]]
-    _inner_dds: KernelInvariant[AD9910[IoUpdateT]]
-    selected_ch: Kernel[int32]
+    _inner_dds: Kernel[AD9910]
     sync_data: KernelInvariant[SyncDataUser]
 
     def __init__(self, dmgr, cpld_device,
@@ -934,10 +866,9 @@ class SharedDDS(Generic[IoUpdateT]):
                  io_update_delay=0, pll_en=1, core_device="core"):
         self.core = dmgr.get(core_device)
         self.cpld = dmgr.get(cpld_device)
-        self._inner_dds = AD9910(dmgr, 3, cpld_device, pll_cp=pll_cp, pll_vco=pll_vco, pll_en=pll_en)
-
-        self.selected_ch = 0
-        self._inner_dds.io_update = _MaskedIOUpdate(self.core, self._inner_dds.cpld, self, self._inner_dds.io_update)
+        self._inner_dds = AD9910(dmgr, 3, cpld_device, pll_cp=pll_cp,
+                                 pll_vco=pll_vco, pll_en=pll_en,
+                                 shared=True)
 
         if isinstance(sync_delay_seeds, str) or isinstance(io_update_delay, str):
             if sync_delay_seeds != io_update_delay:
@@ -952,7 +883,7 @@ class SharedDDS(Generic[IoUpdateT]):
     def update_dds_sel(self, channel: int32):
         """Select a specific DDS channel to accept I/O update"""
         self.cpld.cfg_mask_nu_all(1 << channel)
-        self.selected_ch = channel
+        self._inner_dds.io_update.chip_select = channel + 4
 
     @kernel
     def init(self, blind: bool = False):

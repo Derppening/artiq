@@ -31,11 +31,10 @@ class NAC3Devices(EnvExperiment):
     eeprom_urukul0: KernelInvariant[KasliEEPROM]
     urukul0_ch0: KernelInvariant[AD9912]
     urukul1_cpld: KernelInvariant[UrukulCPLD[ProtoRev9]]
-    urukul1_ch0: KernelInvariant[AD9910[TTLOut]]
+    urukul1_ch0: KernelInvariant[AD9910]
     sampler0: KernelInvariant[Sampler]
-    # NAC3TODO
-    #suservo0: KernelInvariant[SUServo]
-    #suservo0_ch0: KernelInvariant[SUServoChannel]
+    suservo0: Kernel[SUServo]
+    suservo0_ch0: KernelInvariant[SUServoChannel]
     ttl0_counter: KernelInvariant[EdgeCounter]
     grabber0: KernelInvariant[Grabber]
     fastino0: KernelInvariant[Fastino]
@@ -56,9 +55,8 @@ class NAC3Devices(EnvExperiment):
         self.setattr_device("urukul1_cpld")
         self.setattr_device("urukul1_ch0")
         self.setattr_device("sampler0")
-        # NAC3TODO
-        #self.setattr_device("suservo0")
-        #self.setattr_device("suservo0_ch0")
+        self.setattr_device("suservo0")
+        self.setattr_device("suservo0_ch0")
         self.setattr_device("ttl0_counter")
         self.setattr_device("grabber0")
         self.setattr_device("fastino0")

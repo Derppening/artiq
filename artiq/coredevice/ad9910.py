@@ -112,11 +112,8 @@ class SyncDataEeprom:
         self.io_update_delay = int32(io_update_delay)
 
 
-IoUpdateT = TypeVar("IoUpdateT", RegIOUpdate, TTLOut)
-
-
 @compile
-class AD9910(Generic[IoUpdateT]):
+class AD9910:
     """
     AD9910 DDS channel on Urukul.
 
@@ -161,12 +158,12 @@ class AD9910(Generic[IoUpdateT]):
     sysclk: KernelInvariant[float]
     sw: KernelInvariant[Option[TTLOut]]
     sync_data: KernelInvariant[SyncDataUser]
-    io_update: KernelInvariant[IoUpdateT]
+    io_update: Kernel[IOUpdate]
     phase_mode: Kernel[int32]
 
     def __init__(self, dmgr, chip_select, cpld_device, sw_device=None,
                  pll_cp=7, pll_vco=5, sync_delay_seed=-1,
-                 io_update_delay=0, pll_en=True):
+                 io_update_delay=0, pll_en=True, shared=False):
         self.kernel_invariants = {"cpld", "core", "bus", "chip_select",
                                   "pll_en", "pll_n", "pll_vco", "pll_cp",
                                   "ftw_per_hz", "sysclk_per_mu", "sysclk",
@@ -203,10 +200,7 @@ class AD9910(Generic[IoUpdateT]):
         self.sysclk_per_mu = int(round(sysclk * self.core.ref_period))
         self.sysclk = sysclk
 
-        if not self.cpld.io_update:
-            self.io_update = RegIOUpdate(self.cpld, self.chip_select)
-        else:
-            self.io_update = self.cpld.io_update
+        self.io_update = IOUpdate(self.cpld, self.chip_select, use_mask_nu=shared)
 
         # NAC3TODO
         if isinstance(sync_delay_seed, str) or isinstance(io_update_delay,
