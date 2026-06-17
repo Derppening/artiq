@@ -88,8 +88,8 @@ class PhaserMTDDS:
         self.gain_mus = [0b00, 0b00]
 
     @staticmethod
-    def get_rtio_channels(channel_base, **kwargs):
-        return [(channel_base, "base")]
+    def get_rtio_channels(channel, **kwargs):
+        return [(channel, "base")]
 
     @kernel
     def init(self):
@@ -514,8 +514,8 @@ class PhaserDDS:
         self.target_clear = (self.channel << 8) | 3
 
     @staticmethod
-    def get_rtio_channels(channel_base, **kwargs):
-        return [(channel_base, "channel")]
+    def get_rtio_channels(channel, **kwargs):
+        return [(channel, "channel")]
 
     @kernel
     def set_frequency_mu(self, ftw):
@@ -623,8 +623,8 @@ class PhaserServo:
         )
 
     @staticmethod
-    def get_rtio_channels(channel_base, **kwargs):
-        return [(channel_base, "channel")]
+    def get_rtio_channels(channel, **kwargs):
+        return [(channel, "channel")]
 
     @kernel
     def write(self, address, data):
