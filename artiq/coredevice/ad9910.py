@@ -143,6 +143,9 @@ class AD9910:
         Can be a string of the form ``eeprom_device:byte_offset`` to read the
         value from a I2C EEPROM, in which case ``sync_delay_seed`` must be set
         to the same string value.
+    :param shared: Indicate this instance controls multiple AD9910 devices.
+        It enables MASK_NU bits control, in conjuction to TTL-based I/O update
+        pulses (if provided by `cpld_device`).
     """
 
     core: KernelInvariant[Core]
