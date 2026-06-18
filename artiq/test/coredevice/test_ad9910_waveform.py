@@ -10,9 +10,8 @@ from artiq.coredevice.ad9910 import (
     AD9910,
 )
 from artiq.coredevice.core import Core
-from artiq.coredevice.ttl import TTLOut
-from artiq.coredevice.urukul import CPLD as UrukulCPLD, ProtoRev8, ProtoRev9
-from artiq.coredevice.urukul import STA_PROTO_REV_8, STA_PROTO_REV_9
+from artiq.coredevice.urukul import CPLD as UrukulCPLD
+from artiq.coredevice.urukul import STA_PROTO_REV_9
 from artiq.experiment import *
 
 from artiq.test.hardware_testbench import ExperimentCase

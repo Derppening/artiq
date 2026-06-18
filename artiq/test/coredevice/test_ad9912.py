@@ -4,7 +4,6 @@ from artiq.coredevice.ad9912 import AD9912
 from artiq.coredevice.core import Core
 from artiq.coredevice.urukul import (
     CPLD as UrukulCPLD,
-    ProtoRev9,
     STA_PROTO_REV_8,
     STA_PROTO_REV_9,
 )

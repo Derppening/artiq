@@ -9,7 +9,6 @@ from artiq.coredevice.ad9910 import (
     RAM_MODE_RAMPUP,
 )
 from artiq.coredevice.core import Core
-from artiq.coredevice.ttl import TTLOut
 from artiq.coredevice.urukul import (
     CPLD as UrukulCPLD,
     STA_PROTO_REV_8,
