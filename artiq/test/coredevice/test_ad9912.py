@@ -20,7 +20,7 @@ DDS = "urukul_ch1"
 @compile
 class AD9912Exp(EnvExperiment):
     core: KernelInvariant[Core]
-    cpld: KernelInvariant[UrukulCPLD[ProtoRev9]]
+    cpld: KernelInvariant[UrukulCPLD[Auto]]
     dev: KernelInvariant[AD9912]
     io_update_device: Kernel[bool]
 

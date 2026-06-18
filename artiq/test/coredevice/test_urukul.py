@@ -18,7 +18,7 @@ CPLD = "urukul_cpld"
 @compile
 class UrukulExp(EnvExperiment):
     core: KernelInvariant[Core]
-    dev: KernelInvariant[UrukulCPLD[ProtoRev9]]
+    dev: KernelInvariant[UrukulCPLD[Auto]]
 
     def build(self, runner):
         self.setattr_device("core")

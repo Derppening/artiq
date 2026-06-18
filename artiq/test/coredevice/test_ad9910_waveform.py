@@ -93,7 +93,7 @@ def io_update_device(cpld, *required_values, proto_rev=None):
 @compile
 class AD9910WaveformExp(EnvExperiment):
     core: KernelInvariant[Core]
-    cpld: KernelInvariant[UrukulCPLD[ProtoRev9]]
+    cpld: KernelInvariant[UrukulCPLD[Auto]]
     dds1: KernelInvariant[AD9910]
     dds2: KernelInvariant[AD9910]
     io_update_device: Kernel[bool]
@@ -210,8 +210,9 @@ class AD9910WaveformExp(EnvExperiment):
         self.core.reset()
         self.cpld.init()
         # Set ATT_EN
-        self.dds1.cfg_att_en(True)
-        self.dds2.cfg_att_en(True)
+        if self.cpld.proto_rev == STA_PROTO_REV_9:
+            self.dds1.cfg_att_en(True)
+            self.dds2.cfg_att_en(True)
         if not self.io_update_device:
             # Set MASK_NU to trigger CFG.IO_UPDATE
             self.dds1.cfg_mask_nu(True)
@@ -253,7 +254,7 @@ class AD9910WaveformExp(EnvExperiment):
         for i in range(6, -1, -1):
             # Switch channels to Profile i
             self.cpld.set_profile(0, i)
-            if self.multiple_profiles:
+            if self.cpld.proto_rev == STA_PROTO_REV_9:
                 self.cpld.set_profile(3, i)
 
             self.dds1.cfg_sw(True)
@@ -269,8 +270,9 @@ class AD9910WaveformExp(EnvExperiment):
             self.dds2.cfg_mask_nu(False)
 
         # UnSet ATT_EN
-        self.dds1.cfg_att_en(False)
-        self.dds2.cfg_att_en(False)
+        if self.cpld.proto_rev == STA_PROTO_REV_9:
+            self.dds1.cfg_att_en(False)
+            self.dds2.cfg_att_en(False)
 
         self.core.wait_until_mu(now_mu())
 
@@ -490,98 +492,6 @@ class AD9910WaveformExp(EnvExperiment):
         self.core.wait_until_mu(now_mu())
 
 
-@compile
-class AD9910WaveformExp8(EnvExperiment):
-    """ProtoRev8 version of AD9910WaveformExp for testing ProtoRev8-specific functionality."""
-
-    core: KernelInvariant[Core]
-    cpld: KernelInvariant[UrukulCPLD[ProtoRev8]]
-    dds1: KernelInvariant[AD9910]
-    dds2: KernelInvariant[AD9910]
-    io_update_device: Kernel[bool]
-    multiple_profiles: Kernel[bool]
-
-    def build(
-        self,
-        runner,
-        io_update_device=True,
-        multiple_profiles=False,
-    ):
-        self.setattr_device("core")
-        self.cpld = self.get_device(CPLD)
-        self.dds1 = self.get_device(DDS1)
-        self.dds2 = self.get_device(DDS2)
-        self.runner = runner
-        self.io_update_device = io_update_device
-        self.multiple_profiles = multiple_profiles
-
-    def run(self):
-        getattr(self, self.runner)()
-
-    @kernel
-    def toggle_profiles(self):
-        """ProtoRev8 version of toggle_profiles without cfg_att_en (ProtoRev9-only)."""
-        self.core.reset()
-        self.cpld.init()
-        if not self.io_update_device:
-            # Set MASK_NU to trigger CFG.IO_UPDATE
-            self.dds1.cfg_mask_nu(True)
-            self.dds2.cfg_mask_nu(True)
-
-        self.dds1.init()
-        self.dds2.init()
-
-        ## SET SINGLE-TONE PROFILES
-        # Set profiles from 7 to 0
-        frequencies = [
-            0.0,
-            25.0 * MHz,
-            50.0 * MHz,
-            75.0 * MHz,
-            100.0 * MHz,
-            125.0 * MHz,
-            150.0 * MHz,
-            175.0 * MHz,
-        ]
-        for i in range(6, -1, -1):
-            freq_offset = frequencies[i]
-            profile = 7 - i
-            self.dds1.set(FREQ + freq_offset, amplitude=AMP, profile=profile)
-            self.dds2.set(FREQ + freq_offset, amplitude=AMP, profile=profile)
-            self.core.delay(0.5 * s)  # slack
-
-        # Switch on waveforms -- Profile 7 (default)
-        self.dds1.cfg_sw(True)
-        self.dds2.cfg_sw(True)
-        self.dds1.set_att(ATT)
-        self.dds2.set_att(ATT)
-        self.core.delay(2.0 * s)
-        # Switch off waveforms
-        self.dds1.cfg_sw(False)
-        self.dds2.cfg_sw(False)
-
-        # Iterate over Profiles 6 to 0
-        for i in range(6, -1, -1):
-            # Switch channels to Profile i
-            self.cpld.set_profile(0, i)
-            if self.multiple_profiles:
-                self.cpld.set_profile(3, i)
-
-            self.dds1.cfg_sw(True)
-            self.dds2.cfg_sw(True)
-            self.core.delay(2.0 * s)
-            # Switch off waveforms
-            self.dds1.cfg_sw(False)
-            self.dds2.cfg_sw(False)
-
-        if not self.io_update_device:
-            # Unset MASK_NU to un-trigger CFG.IO_UPDATE
-            self.dds1.cfg_mask_nu(False)
-            self.dds2.cfg_mask_nu(False)
-
-        self.core.wait_until_mu(now_mu())
-
-
 class AD9910WaveformTest(ExperimentCase):
     def test_instantiate(self):
         self.execute(AD9910WaveformExp, "instantiate")
@@ -596,17 +506,8 @@ class AD9910WaveformTest(ExperimentCase):
             AD9910WaveformExp, "single_tone", io_update_device=io_update_device
         )
 
-    @io_update_device(CPLD, True, False, proto_rev=STA_PROTO_REV_8)
-    def test_toggle_profiles_proto_rev8(self, io_update_device):
-        self.execute(
-            AD9910WaveformExp8,
-            "toggle_profiles",
-            io_update_device=io_update_device,
-            multiple_profiles=False,
-        )
-
-    @io_update_device(CPLD, True, False, proto_rev=STA_PROTO_REV_9)
-    def test_toggle_profiles_proto_rev9(self, io_update_device):
+    @io_update_device(CPLD, True, False)
+    def test_toggle_profiles(self, io_update_device):
         self.execute(
             AD9910WaveformExp,
             "toggle_profiles",
