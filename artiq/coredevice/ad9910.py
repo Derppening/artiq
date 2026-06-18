@@ -523,6 +523,7 @@ class AD9910:
         # enable amplitude scale from profiles
         # read effective FTW
         # sync timing validation disable (enabled later)
+        self.core.break_realtime()
         self.set_cfr2(sync_validation_disable=1)
         self.io_update.pulse(1. * us)
         cfr3 = (0x0807c000 | (self.pll_vco << 24) |
