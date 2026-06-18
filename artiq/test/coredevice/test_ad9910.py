@@ -31,7 +31,7 @@ DDS = "urukul_ch0"
 class AD9910Exp(EnvExperiment):
     core: KernelInvariant[Core]
     cpld: KernelInvariant[UrukulCPLD[ProtoRev9]]
-    dev: KernelInvariant[AD9910[TTLOut]]
+    dev: KernelInvariant[AD9910]
     io_update_device: Kernel[bool]
 
     def build(self, runner, io_update_device=True):
@@ -325,13 +325,13 @@ class AD9910Exp(EnvExperiment):
             # If PROFILE is not alligned to SYNC_CLK a multi-bit change
             # doesn't transfer cleanly. Use IO_UPDATE to load the profile
             # again.
-            self.cpld.io_update.pulse_mu(int64(8))
+            self.dev.io_update.pulse_mu(int64(8))
             ftw[i] = self.dev.read32(_AD9910_REG_FTW)
             self.core.delay(100.0 * us)
-        self.report_list_int32("ftw", ftw)
         if not self.io_update_device:
             # Unset MASK_NU to un-trigger CFG.IO_UPDATE
             self.dev.cfg_mask_nu(False)
+        self.report_list_int32("ftw", ftw)
 
     @kernel
     def ram_write(self):
@@ -348,7 +348,7 @@ class AD9910Exp(EnvExperiment):
             self.dev.cfg_mask_nu(True)
         self.dev.init()
         self.dev.set_cfr1(ram_enable=0)
-        self.cpld.io_update.pulse_mu(int64(8))
+        self.dev.io_update.pulse_mu(int64(8))
         self.dev.set_profile_ram(
             start=0, end=0 + n - 1, step=1,
             profile=0, mode=RAM_MODE_RAMPUP)
@@ -380,7 +380,7 @@ class AD9910Exp(EnvExperiment):
             self.dev.cfg_mask_nu(True)
         self.dev.init()
         self.dev.set_cfr1(ram_enable=0)
-        self.cpld.io_update.pulse_mu(int64(8))
+        self.dev.io_update.pulse_mu(int64(8))
 
         self.dev.set_profile_ram(
             start=0, end=0 + len(write) - 1, step=1, profile=0, mode=RAM_MODE_RAMPUP
@@ -425,7 +425,7 @@ class AD9910Exp(EnvExperiment):
             self.dev.cfg_mask_nu(True)
         self.dev.init()
         self.dev.set_cfr1(ram_enable=0)
-        self.cpld.io_update.pulse_mu(int64(8))
+        self.dev.io_update.pulse_mu(int64(8))
 
         self.dev.set_profile_ram(
             start=100, end=100 + len(ftw0) - 1, step=1, profile=3, mode=RAM_MODE_RAMPUP
@@ -443,7 +443,7 @@ class AD9910Exp(EnvExperiment):
         self.dev.write_ram(ftw1)
 
         self.dev.set_cfr1(ram_enable=1, ram_destination=RAM_DEST_FTW)
-        self.cpld.io_update.pulse_mu(int64(8))
+        self.dev.io_update.pulse_mu(int64(8))
 
         self.cpld.set_profile(self.dev.chip_select - 4, 3)
         self.dev.io_update.pulse_mu(int64(8))
@@ -474,7 +474,7 @@ class AD9910Exp(EnvExperiment):
             self.dev.cfg_mask_nu(True)
         self.dev.init()
         self.dev.set_cfr1(ram_enable=0)
-        self.cpld.io_update.pulse_mu(int64(8))
+        self.dev.io_update.pulse_mu(int64(8))
         self.dev.set_profile_ram(
             start=100, end=100 + len(ram) - 1, step=1,
             profile=6, mode=RAM_MODE_RAMPUP)
@@ -482,7 +482,7 @@ class AD9910Exp(EnvExperiment):
         self.dev.io_update.pulse_mu(int64(8))
         self.dev.write_ram(ram)
         self.dev.set_cfr1(ram_enable=1, ram_destination=RAM_DEST_FTW)
-        self.cpld.io_update.pulse_mu(int64(8))
+        self.dev.io_update.pulse_mu(int64(8))
         ftw_read = self.dev.read32(_AD9910_REG_FTW)
         self.report_list_int32("ram", ram)
         self.report_int32("ftw_read", ftw_read)
@@ -509,7 +509,7 @@ class AD9910Exp8(EnvExperiment):
 
     core: KernelInvariant[Core]
     cpld: KernelInvariant[UrukulCPLD[ProtoRev8]]
-    dev: KernelInvariant[AD9910[TTLOut]]
+    dev: KernelInvariant[AD9910]
     io_update_device: Kernel[bool]
 
     def build(self, runner, io_update_device=True):

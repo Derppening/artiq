@@ -58,9 +58,6 @@ def io_update_device(cpld, *required_values, proto_rev=None):
         @wraps(test_func)
         def wrapper(self, *args, **kwargs):
             for required in required_values:
-                # NAC3TODO
-                if not required:
-                    self.skipTest("NAC3: io_update_device is currently required.")
                 with self.subTest(io_update_device=required):
                     try:
                         desc = self.device_mgr.get_desc(cpld)
@@ -97,8 +94,8 @@ def io_update_device(cpld, *required_values, proto_rev=None):
 class AD9910WaveformExp(EnvExperiment):
     core: KernelInvariant[Core]
     cpld: KernelInvariant[UrukulCPLD[ProtoRev9]]
-    dds1: KernelInvariant[AD9910[TTLOut]]
-    dds2: KernelInvariant[AD9910[TTLOut]]
+    dds1: KernelInvariant[AD9910]
+    dds2: KernelInvariant[AD9910]
     io_update_device: Kernel[bool]
     multiple_profiles: Kernel[bool]
     osk_manual: Kernel[bool]
@@ -299,7 +296,7 @@ class AD9910WaveformExp(EnvExperiment):
             self.dds1.write32(_AD9910_REG_ASF, 0xFFFF << 16 | 0x3FFF << 2 | 0b11)
             self.dds1.set_cfr1(osk_enable=1, select_auto_osk=1)
 
-        self.cpld.io_update.pulse(1.0 * ms)
+        self.cpld.io_update.unwrap().pulse(1.0 * ms)
 
         # Switch on waveform, then set attenuation
         self.dds1.cfg_sw(True)
@@ -381,7 +378,7 @@ class AD9910WaveformExp(EnvExperiment):
             drg_nodwell_high=self.nodwell,
             drg_nodwell_low=self.nodwell,
         )
-        self.cpld.io_update.pulse(1.0 * ms)
+        self.cpld.io_update.unwrap().pulse(1.0 * ms)
 
         # Enable waveform and set attenuation
         self.dds1.cfg_sw(True)
@@ -499,8 +496,8 @@ class AD9910WaveformExp8(EnvExperiment):
 
     core: KernelInvariant[Core]
     cpld: KernelInvariant[UrukulCPLD[ProtoRev8]]
-    dds1: KernelInvariant[AD9910[TTLOut]]
-    dds2: KernelInvariant[AD9910[TTLOut]]
+    dds1: KernelInvariant[AD9910]
+    dds2: KernelInvariant[AD9910]
     io_update_device: Kernel[bool]
     multiple_profiles: Kernel[bool]
 

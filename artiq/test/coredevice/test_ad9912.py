@@ -78,11 +78,11 @@ class AD9912Exp(EnvExperiment):
         self.dev.set(frequency=f, phase=p)
         self.core.break_realtime()
         att_mu = self.dev.get_att_mu()
-        self.report_int32("att_set", self.cpld.att_to_mu(att))
-        self.report_int32("att_get", att_mu)
         if not self.io_update_device:
             # Unset MASK_NU to un-trigger CFG.IO_UPDATE
             self.dev.cfg_mask_nu(False)
+        self.report_int32("att_set", self.cpld.att_to_mu(att))
+        self.report_int32("att_get", att_mu)
 
     @kernel
     def set_speed(self):
