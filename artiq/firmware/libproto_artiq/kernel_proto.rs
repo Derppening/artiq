@@ -149,10 +149,7 @@ pub enum Message<'a> {
         height: u16,
         pixel_code: u16,
     },
-    UpdateNow(u64),
 
-    Log(fmt::Arguments<'a>),
-    LogSlice(&'a str),
     GrabberUartReadRequest {
         destination: u8,
         g: u8,
@@ -169,6 +166,11 @@ pub enum Message<'a> {
     GrabberUartWriteReply {
         succeeded: bool
     },
+
+    UpdateNow(u64),
+
+    Log(fmt::Arguments<'a>),
+    LogSlice(&'a str),
 }
 
 pub use self::Message::*;
