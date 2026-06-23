@@ -14,7 +14,7 @@ ARTIQ-10 (Unreleased)
 * Novogorny (the ancestor of Sampler) is no longer supported.
 * The deprecated "base" field of JSON system descriptions has been removed. Use "drtio_role" instead.
 * Zynq platforms now allow setting default route and network prefix in the configuration entries
-* The IPv4 and IPv6 default route configuration entres were renamed
+* The IPv4 and IPv6 default route configuration entries were renamed
  - `ipv4_default_route` was renamed to `ip_default_route`
  - `ipv6_default_route` was renamed to `ip6_default_route`
 
