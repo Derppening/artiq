@@ -13,7 +13,7 @@ from artiq.coredevice.spi2 import SPI_END, SPIMaster
 from artiq.coredevice import ad9910, urukul, sampler
 from artiq.coredevice.ttl import TTLOut
 from artiq.coredevice.urukul import CPLD
-from artiq.coredevice.ad9910 import AD9910, STA_PROTO_REV_9
+from artiq.coredevice.ad9910 import AD9910, STA_PROTO_REV_9, SyncDataUser as AD9910SyncData
 from artiq.coredevice.sampler import adc_mu_to_volt as sampler_adc_mu_to_volt, SPI_CONFIG as SAMPLER_SPI_CONFIG, SPI_CS_PGIA as SAMPLER_SPI_CS_PGIA
 
 
@@ -40,7 +40,232 @@ def adc_mu_to_volts(x: int32, gain: int32, corrected_fs: bool = True) -> float:
 
 
 @compile
-class SUServo:
+class SyncDataUser:
+    core: Core
+    sync_delay_seeds: Kernel[list[int32]]
+    io_update_delay: Kernel[int32]
+
+    def __init__(self, core, sync_delay_seeds, io_update_delay):
+        self.core = core
+        self.sync_delay_seeds = sync_delay_seeds
+        self.io_update_delay = io_update_delay
+
+    @kernel
+    def init(self):
+        pass
+
+
+@compile
+class SyncDataEeprom:
+    core: Core
+    eeprom_device: KernelInvariant[KasliEEPROM]
+    eeprom_offset: KernelInvariant[int32]
+    sync_delay_seeds: Kernel[list[int32]]
+    io_update_delay: Kernel[int32]
+
+    def __init__(self, dmgr, core, eeprom_str):
+        self.core = core
+
+        eeprom_device, eeprom_offset = eeprom_str.split(":")
+        self.eeprom_device = dmgr.get(eeprom_device)
+        self.eeprom_offset = int(eeprom_offset)
+
+        self.sync_delay_seeds = [0] * 4
+        self.io_update_delay = 0
+
+    @kernel
+    def init(self):
+        word = self.eeprom_device.read_i32(self.eeprom_offset)
+        for i in range(len(self.sync_delay_seeds)):
+            self.sync_delay_seeds[i] = (word >> (i * 5)) & 0x1F
+        io_update_delay = (word >> 20) & 0xFFF
+        if io_update_delay == 0xFFF:    # unprogrammed EEPROM
+            self.io_update_delay = 0
+        else:
+            self.io_update_delay = int32(io_update_delay)
+
+
+SyncDataT = TypeVar("SyncDataT", SyncDataUser, SyncDataEeprom)
+
+
+@compile
+class SharedDDS(Generic[SyncDataT]):
+    """DDS configuration device for SU-Servo.
+
+    Shared DDS device controls all 4 DDSes on the same Urukul device. Control
+    of the 4 channels is multiplexed by selecting the corresponding MASK_NU
+    bit prior to SPI transaction. IO_UPDATE is transferred by temporarily
+    disabling the corresponding MASK_NU bit.
+
+    :param cpld_device: Name of the Urukul CPLD this device is on.
+    :param pll_en: PLL enable bit, set to 0 to bypass PLL (default: 1).
+        Note that when bypassing the PLL the red front panel LED may remain on.
+    :param pll_cp: DDS PLL charge pump setting.
+    :param pll_vco: DDS PLL VCO range selection.
+    :param sync_delay_seeds: ``SYNC_IN`` delays tuning starting value.
+        To stabilize the ``SYNC_IN`` delays tuning, run :meth:`tune_sync_delays`
+        once and set this to the delay tap number returned
+        (default: [-1, -1, -1, -1] to signal no synchronization and no tuning
+        during :meth:`init`).
+        Can be a string of the form ``eeprom_device:byte_offset`` to read the
+        value from a I2C EEPROM, in which case ``io_update_delay`` must be set
+        to the same string value.
+    :param io_update_delay: ``IO_UPDATE`` pulse alignment delay.
+        To align ``IO_UPDATE`` to ``SYNC_CLK``,
+        run :meth:`tune_io_update_group_delay` and set this to the delay tap
+        number returned.
+        Can be a string of the form ``eeprom_device:byte_offset`` to read the
+        value from a I2C EEPROM, in which case ``sync_delay_seeds`` must be set
+        to the same string value.
+    :param core_device: Core device name
+    """
+    core: KernelInvariant[Core]
+    cpld: KernelInvariant[CPLD[Auto]]
+    _inner_dds: Kernel[AD9910[AD9910SyncData]]
+    sync_data: KernelInvariant[SyncDataT]
+
+    def __init__(self, dmgr, cpld_device,
+                 pll_cp=7, pll_vco=5, sync_delay_seeds=[-1, -1, -1, -1],
+                 io_update_delay=0, pll_en=1, core_device="core"):
+        self.core = dmgr.get(core_device)
+        self.cpld = dmgr.get(cpld_device)
+        self._inner_dds = AD9910(dmgr, 3, cpld_device, pll_cp=pll_cp,
+                                 pll_vco=pll_vco, pll_en=pll_en,
+                                 shared=True)
+
+        if isinstance(sync_delay_seeds, str) or isinstance(io_update_delay, str):
+            if sync_delay_seeds != io_update_delay:
+                raise ValueError("When using EEPROM, sync_delay_seeds must be "
+                                 "equal to io_update_delay")
+            self.sync_data = SyncDataEeprom(dmgr, self.core, sync_delay_seeds)
+        else:
+            self.sync_data = SyncDataUser(self.core, sync_delay_seeds,
+                                          io_update_delay)
+
+    @portable
+    def update_dds_sel(self, channel: int32):
+        """Select a specific DDS channel to accept I/O update"""
+
+        # Make MASK_NU defaults at 1 << channel
+        # This allows SPI readback when I/O update deasserts
+        self.cpld.cfg_mask_nu_all(1 << channel)
+
+        # I/O update should restore MASK_NU to this on completion
+        self._inner_dds.io_update.chip_select = channel + 4
+
+    @kernel
+    def init(self, blind: bool = False):
+        """Initialize and configure the SU-Servo as a whole.
+
+        See the :meth:`~artiq.coredevice.ad9910.AD9910.init` method of
+        :class:`~artiq.coredevice.ad9910.AD9910` for AD9910 initialization.
+
+        :param blind: Do not read back DDS identity and do not wait for lock.
+            See :meth:`~artiq.coredevice.ad9910.AD9910.init`.
+        """
+        self.core.break_realtime()
+        self.sync_data.init()
+        for i in range(4):
+            self.core.break_realtime()
+            self.update_dds_sel(i)
+            self.core.break_realtime()
+            self._inner_dds.init(blind=blind, dds_channel_idx=i)
+
+            if self.sync_data.sync_delay_seeds != [-1, -1, -1, -1]:
+                self._inner_dds.tune_sync_delay(self.sync_data.sync_delay_seeds[i], dds_channel_idx=i)
+
+        # Disable MASK_NU to resume QSPI
+        self.cpld.cfg_mask_nu_all(0)
+
+    @kernel
+    def _get_delay(self, ch: int32) -> int32:
+        self.core.break_realtime()
+        self.update_dds_sel(ch)
+        self.core.break_realtime()
+        dly, _ = self._inner_dds.tune_sync_delay(dds_channel_idx=ch)
+        return dly
+
+    @kernel
+    def tune_sync_delays(self) -> tuple[int32, int32, int32, int32]:
+        """Find a set of stable ``SYNC_IN`` delays.
+
+        This method first locates a set of ``SYNC_IN`` delays via
+        :meth:`~artiq.coredevice.ad9910.AD9910.tune_sync_delay` of
+        :class:`~artiq.coredevice.ad9910.AD9910`.
+
+        This method and :meth:`tune_io_update_group_delay` can be run in any
+        order.
+
+        :return: Tuple of optimal delays.
+        """
+        return self._get_delay(0), self._get_delay(1), self._get_delay(2), self._get_delay(3)
+
+    @kernel
+    def tune_io_update_group_delay(self) -> int32:
+        """Find a stable ``IO_UPDATE`` delay alignment suitable for all DDS
+        channels.
+
+        Scan through increasing ``IO_UPDATE`` delays until a delay is found
+        that lets ``IO_UPDATE`` be registered in the next ``SYNC_CLK`` cycle.
+        Return an ``IO_UPDATE`` delay that does not coincide with any
+        ``SYNC_CLK`` edges.
+
+        This method assumes that the ``IO_UPDATE`` TTLOut device has one
+        machine unit resolution (SERDES).
+
+        This method and :meth:`tune_sync_delays` can be run in any order.
+
+        :return: ``IO_UPDATE`` delay to be passed to the constructor
+            :class:`~artiq.coredevice.urukul.CPLD` via the device database.
+        """
+        period = self._inner_dds.sysclk_per_mu * 4  # SYNC_CLK period
+        sync_clk_offset = [ 0 for _ in range(period) ]
+        repeat = 100
+        for channel in range(4):
+            self.update_dds_sel(channel)
+            for i in range(period):
+                t = 0
+                # check whether the sync edge is strictly between i, i+2
+                for j in range(repeat):
+                    t += self._inner_dds.measure_io_update_alignment(int64(i), int64(i + 2))
+                if t != 0:  # no certain edge
+                    continue
+                # check left/right half: i,i+1 and i+1,i+2
+                t1 = [0, 0]
+                for j in range(repeat):
+                    t1[0] += self._inner_dds.measure_io_update_alignment(int64(i), int64(i + 1))
+                    t1[1] += self._inner_dds.measure_io_update_alignment(int64(i + 1), int64(i + 2))
+                if ((t1[0] == 0 and t1[1] == 0) or
+                        (t1[0] == repeat and t1[1] == repeat)):
+                    # edge is not close to i + 1, can't interpret result
+                    raise ValueError(
+                        "no clear IO_UPDATE-SYNC_CLK alignment edge found")
+                else:
+                    sync_clk_offset[(i + 1) % period] += 1
+                    break
+
+        # Find an offset that isn't aligned by SYNC_CLK
+        for i in range(period):
+            if sync_clk_offset[i] == 0:
+                return i
+
+        raise ValueError("IO_UPDATE-SYNC_CLK alignment edges are too broad")
+
+    @portable
+    def frequency_to_ftw(self, frequency: float) -> int32:
+        """Return the 32-bit frequency tuning word corresponding to the given
+        frequency."""
+        return self._inner_dds.frequency_to_ftw(frequency)
+
+    @portable
+    def turns_to_pow(self, turns: float) -> int32:
+        """Return the 16-bit phase offset word corresponding to the given phase
+        in turns."""
+        return self._inner_dds.turns_to_pow(turns)
+
+
+@compile
+class SUServo(Generic[SyncDataT]):
     """Sampler-Urukul Servo parent and configuration device.
 
     Sampler-Urukul Servo is a integrated device controlling one
@@ -77,7 +302,7 @@ class SUServo:
 
     core: KernelInvariant[Core]
     pgia: KernelInvariant[SPIMaster]
-    ddses: KernelInvariant[list[SharedDDS]]
+    ddses: KernelInvariant[list[SharedDDS[SyncDataT]]]
     cplds: KernelInvariant[list[CPLD[Auto]]]
     channel: KernelInvariant[int32]
     gains: Kernel[int32]
@@ -330,7 +555,7 @@ class SUServo:
 
 
 @compile
-class Channel:
+class Channel(Generic[SyncDataT]):
     """Sampler-Urukul Servo channel
 
     :param channel: RTIO channel number
@@ -338,10 +563,10 @@ class Channel:
     """
 
     core: KernelInvariant[Core]
-    servo: KernelInvariant[SUServo]
+    servo: KernelInvariant[SUServo[SyncDataT]]
     channel: KernelInvariant[int32]
     servo_channel: KernelInvariant[int32]
-    dds: KernelInvariant[SharedDDS]
+    dds: KernelInvariant[SharedDDS[SyncDataT]]
 
     def __init__(self, dmgr, channel, servo_device):
         self.servo = dmgr.get(servo_device)
@@ -778,219 +1003,3 @@ class Channel:
             raise ValueError("Invalid SUServo y-value!")
         self.set_y_mu(profile, y_mu)
         return y_mu
-
-
-@compile
-class SyncDataUser:
-    core: Core
-    sync_delay_seeds: Kernel[list[int32]]
-    io_update_delay: Kernel[int32]
-
-    def __init__(self, core, sync_delay_seeds, io_update_delay):
-        self.core = core
-        self.sync_delay_seeds = sync_delay_seeds
-        self.io_update_delay = io_update_delay
-
-    @kernel
-    def init(self):
-        pass
-
-
-@compile
-class SyncDataEeprom:
-    core: Core
-    eeprom_device: KernelInvariant[KasliEEPROM]
-    eeprom_offset: KernelInvariant[int32]
-    sync_delay_seeds: Kernel[list[int32]]
-    io_update_delay: Kernel[int32]
-
-    def __init__(self, dmgr, core, eeprom_str):
-        self.core = core
-
-        eeprom_device, eeprom_offset = eeprom_str.split(":")
-        self.eeprom_device = dmgr.get(eeprom_device)
-        self.eeprom_offset = int(eeprom_offset)
-
-        self.sync_delay_seeds = [0] * 4
-        self.io_update_delay = 0
-
-    @kernel
-    def init(self):
-        word = self.eeprom_device.read_i32(self.eeprom_offset)
-        for i in range(len(self.sync_delay_seeds)):
-            self.sync_delay_seeds[i] = (word >> (i * 5)) & 0x1F
-        io_update_delay = (word >> 20) & 0xFFF
-        if io_update_delay == 0xFFF:    # unprogrammed EEPROM
-            self.io_update_delay = 0
-        else:
-            self.io_update_delay = int32(io_update_delay)
-
-@compile
-class SharedDDS:
-    """DDS configuration device for SU-Servo.
-
-    Shared DDS device controls all 4 DDSes on the same Urukul device. Control
-    of the 4 channels is multiplexed by selecting the corresponding MASK_NU
-    bit prior to SPI transaction. IO_UPDATE is transferred by temporarily
-    disabling the corresponding MASK_NU bit.
-
-    :param cpld_device: Name of the Urukul CPLD this device is on.
-    :param pll_en: PLL enable bit, set to 0 to bypass PLL (default: 1).
-        Note that when bypassing the PLL the red front panel LED may remain on.
-    :param pll_cp: DDS PLL charge pump setting.
-    :param pll_vco: DDS PLL VCO range selection.
-    :param sync_delay_seeds: ``SYNC_IN`` delays tuning starting value.
-        To stabilize the ``SYNC_IN`` delays tuning, run :meth:`tune_sync_delays`
-        once and set this to the delay tap number returned
-        (default: [-1, -1, -1, -1] to signal no synchronization and no tuning
-        during :meth:`init`).
-        Can be a string of the form ``eeprom_device:byte_offset`` to read the
-        value from a I2C EEPROM, in which case ``io_update_delay`` must be set
-        to the same string value.
-    :param io_update_delay: ``IO_UPDATE`` pulse alignment delay.
-        To align ``IO_UPDATE`` to ``SYNC_CLK``,
-        run :meth:`tune_io_update_group_delay` and set this to the delay tap
-        number returned.
-        Can be a string of the form ``eeprom_device:byte_offset`` to read the
-        value from a I2C EEPROM, in which case ``sync_delay_seeds`` must be set
-        to the same string value.
-    :param core_device: Core device name
-    """
-    core: KernelInvariant[Core]
-    cpld: KernelInvariant[CPLD[Auto]]
-    _inner_dds: Kernel[AD9910]
-    sync_data: KernelInvariant[SyncDataUser]
-
-    def __init__(self, dmgr, cpld_device,
-                 pll_cp=7, pll_vco=5, sync_delay_seeds=[-1, -1, -1, -1],
-                 io_update_delay=0, pll_en=1, core_device="core"):
-        self.core = dmgr.get(core_device)
-        self.cpld = dmgr.get(cpld_device)
-        self._inner_dds = AD9910(dmgr, 3, cpld_device, pll_cp=pll_cp,
-                                 pll_vco=pll_vco, pll_en=pll_en,
-                                 shared=True)
-
-        if isinstance(sync_delay_seeds, str) or isinstance(io_update_delay, str):
-            if sync_delay_seeds != io_update_delay:
-                raise ValueError("When using EEPROM, sync_delay_seeds must be "
-                                 "equal to io_update_delay")
-            self.sync_data = SyncDataEeprom(dmgr, self.core, sync_delay_seeds)
-        else:
-            self.sync_data = SyncDataUser(self.core, sync_delay_seeds,
-                                          io_update_delay)
-
-    @portable
-    def update_dds_sel(self, channel: int32):
-        """Select a specific DDS channel to accept I/O update"""
-        self.cpld.cfg_mask_nu_all(1 << channel)
-        self._inner_dds.io_update.chip_select = channel + 4
-
-    @kernel
-    def init(self, blind: bool = False):
-        """Initialize and configure the SU-Servo as a whole.
-
-        See the :meth:`~artiq.coredevice.ad9910.AD9910.init` method of
-        :class:`~artiq.coredevice.ad9910.AD9910` for AD9910 initialization.
-
-        :param blind: Do not read back DDS identity and do not wait for lock.
-            See :meth:`~artiq.coredevice.ad9910.AD9910.init`.
-        """
-        self.core.break_realtime()
-        self.sync_data.init()
-        for i in range(4):
-            self.core.break_realtime()
-            self.update_dds_sel(i)
-            self.core.break_realtime()
-            self._inner_dds.init(blind=blind, dds_channel_idx=i)
-
-            if self.sync_data.sync_delay_seeds != [-1, -1, -1, -1]:
-                self._inner_dds.tune_sync_delay(self.sync_data.sync_delay_seeds[i], dds_channel_idx=i)
-
-        # Disable MASK_NU to resume QSPI
-        self.cpld.cfg_mask_nu_all(0)
-
-    @kernel
-    def _get_delay(self, ch: int32) -> int32:
-        self.core.break_realtime()
-        self.update_dds_sel(ch)
-        self.core.break_realtime()
-        dly, _ = self._inner_dds.tune_sync_delay(dds_channel_idx=ch)
-        return dly
-        
-    @kernel
-    def tune_sync_delays(self) -> tuple[int32, int32, int32, int32]:
-        """Find a set of stable ``SYNC_IN`` delays.
-
-        This method first locates a set of ``SYNC_IN`` delays via
-        :meth:`~artiq.coredevice.ad9910.AD9910.tune_sync_delay` of
-        :class:`~artiq.coredevice.ad9910.AD9910`.
-
-        This method and :meth:`tune_io_update_group_delay` can be run in any
-        order.
-
-        :return: Tuple of optimal delays.
-        """
-        return self._get_delay(0), self._get_delay(1), self._get_delay(2), self._get_delay(3)
-
-    @kernel
-    def tune_io_update_group_delay(self) -> int32:
-        """Find a stable ``IO_UPDATE`` delay alignment suitable for all DDS
-        channels.
-
-        Scan through increasing ``IO_UPDATE`` delays until a delay is found
-        that lets ``IO_UPDATE`` be registered in the next ``SYNC_CLK`` cycle.
-        Return an ``IO_UPDATE`` delay that does not coincide with any
-        ``SYNC_CLK`` edges.
-
-        This method assumes that the ``IO_UPDATE`` TTLOut device has one
-        machine unit resolution (SERDES).
-
-        This method and :meth:`tune_sync_delays` can be run in any order.
-
-        :return: ``IO_UPDATE`` delay to be passed to the constructor
-            :class:`~artiq.coredevice.urukul.CPLD` via the device database.
-        """
-        period = self._inner_dds.sysclk_per_mu * 4  # SYNC_CLK period
-        sync_clk_offset = [ 0 for _ in range(period) ]
-        repeat = 100
-        for channel in range(4):
-            self.update_dds_sel(channel)
-            for i in range(period):
-                t = 0
-                # check whether the sync edge is strictly between i, i+2
-                for j in range(repeat):
-                    t += self._inner_dds.measure_io_update_alignment(int64(i), int64(i + 2))
-                if t != 0:  # no certain edge
-                    continue
-                # check left/right half: i,i+1 and i+1,i+2
-                t1 = [0, 0]
-                for j in range(repeat):
-                    t1[0] += self._inner_dds.measure_io_update_alignment(int64(i), int64(i + 1))
-                    t1[1] += self._inner_dds.measure_io_update_alignment(int64(i + 1), int64(i + 2))
-                if ((t1[0] == 0 and t1[1] == 0) or
-                        (t1[0] == repeat and t1[1] == repeat)):
-                    # edge is not close to i + 1, can't interpret result
-                    raise ValueError(
-                        "no clear IO_UPDATE-SYNC_CLK alignment edge found")
-                else:
-                    sync_clk_offset[(i + 1) % period] += 1
-                    break
-
-        # Find an offset that isn't aligned by SYNC_CLK
-        for i in range(period):
-            if sync_clk_offset[i] == 0:
-                return i
-
-        raise ValueError("IO_UPDATE-SYNC_CLK alignment edges are too broad")
-
-    @portable
-    def frequency_to_ftw(self, frequency: float) -> int32:
-        """Return the 32-bit frequency tuning word corresponding to the given
-        frequency."""
-        return self._inner_dds.frequency_to_ftw(frequency)
-
-    @portable
-    def turns_to_pow(self, turns: float) -> int32:
-        """Return the 16-bit phase offset word corresponding to the given phase
-        in turns."""
-        return self._inner_dds.turns_to_pow(turns)

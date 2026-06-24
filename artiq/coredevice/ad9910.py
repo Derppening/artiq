@@ -112,8 +112,11 @@ class SyncDataEeprom:
         self.io_update_delay = int32(io_update_delay)
 
 
+SyncDataT = TypeVar("SyncDataT", SyncDataUser, SyncDataEeprom)
+
+
 @compile
-class AD9910:
+class AD9910(Generic[SyncDataT]):
     """
     AD9910 DDS channel on Urukul.
 
@@ -160,7 +163,7 @@ class AD9910:
     sysclk_per_mu: KernelInvariant[int32]
     sysclk: KernelInvariant[float]
     sw: KernelInvariant[Option[TTLOut]]
-    sync_data: KernelInvariant[SyncDataUser]
+    sync_data: KernelInvariant[SyncDataT]
     io_update: Kernel[IOUpdate]
     phase_mode: Kernel[int32]
 
