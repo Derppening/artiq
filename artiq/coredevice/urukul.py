@@ -125,6 +125,7 @@ class IOUpdate:
 
     @kernel
     def get_mask_nu(self) -> int32:
+        """Get current MASK_NU from the cached CFG register value"""
         return int32(self.cpld.cfg_reg >> self.mask_nu_offset.unwrap()) & 0xF
 
     @kernel
@@ -179,21 +180,27 @@ class IOUpdate:
 
     @kernel
     def pulse_mu(self, duration: int64):
-        """Unset MASK_NU, then pulse the IO Update TTL high for the specified
-        duration (in machine units). MASK_NU is restored to the previous value
-        after the I/O pulse.
+        """Emit an I/O Update pulse.
+
+        See `pulse_io_update_mu` on I/O update implementation.
+
+        With MASK_NU control disabled, the time cursor is advanced by the I/O
+        update pulse duration only.
+
+        With MASK_NU control enabled, a pair of CFG writes to pre/post-
+        configure MASK_NU, wraps around the I/O update pulse, to enable I/O
+        updates from TTL temporarily.
 
         The I/O update TTL supports fine time stamp. Controlling I/O update
         through TTL requires Urukul CFG writes, but CFG writes does not
         support fine time stamps.
 
-        Hence, a pair of preamble and postamble CFG writes (with coarse clock
-        alignments) are issued to enable I/O updates from TTL temporarily.
-        ``aligned_write_cfg_mask_nu`` implements the preamble/postamble writes.
+        Hence, the pair of MASK_NU preamble and postamble CFG writes are
+        augmented with coarse clock alignments.
 
-        The time cursor is advanced by the sum of:
-        - 2 CFG writes (enable/disable MASK_NU)
-        - 2 coarse RTIO cycles (coarse clock alignment), and
+        The time cursor with MASK_NU control is advanced by the sum of:
+        - 2 CFG writes (enable/disable MASK_NU, if needed)
+        - 2 coarse RTIO cycles (coarse clock alignment, if needed), and
         - I/O update pulse duration"""
         init_mask_nu = 0
         mask_nu = 0 if self.cpld.io_update.is_some() else 0xF
