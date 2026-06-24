@@ -196,17 +196,17 @@ class IOUpdate:
         - 2 coarse RTIO cycles (coarse clock alignment), and
         - I/O update pulse duration"""
         init_mask_nu = 0
+        mask_nu = 0
         if self.mask_nu_offset.is_some():
             init_mask_nu = self.get_mask_nu()
-            if self.chip_select == CS_DDS_MULTI:
-                mask_nu = 0
-            else:
-                mask_nu = (1 << (self.chip_select - 4)) & init_mask_nu
-            self.aligned_write_cfg_mask_nu(mask_nu)
+            if self.chip_select != CS_DDS_MULTI:
+                mask_nu = 0xf & ~(1 << (self.chip_select - 4))
+            if mask_nu != init_mask_nu:
+                self.aligned_write_cfg_mask_nu(mask_nu)
 
         self.pulse_io_update_mu(duration)
 
-        if self.mask_nu_offset.is_some():
+        if self.mask_nu_offset.is_some() and mask_nu != init_mask_nu:
             self.aligned_write_cfg_mask_nu(init_mask_nu)
 
     @kernel
@@ -215,17 +215,17 @@ class IOUpdate:
 
         See pulse_mu."""
         init_mask_nu = 0
+        mask_nu = 0
         if self.mask_nu_offset.is_some():
             init_mask_nu = self.get_mask_nu()
-            if self.chip_select == CS_DDS_MULTI:
-                mask_nu = 0
-            else:
-                mask_nu = (1 << (self.chip_select - 4)) & init_mask_nu
-            self.aligned_write_cfg_mask_nu(mask_nu)
+            if self.chip_select != CS_DDS_MULTI:
+                mask_nu = 0xf & ~(1 << (self.chip_select - 4))
+            if mask_nu != init_mask_nu:
+                self.aligned_write_cfg_mask_nu(mask_nu)
 
         self.pulse_io_update(duration)
 
-        if self.mask_nu_offset.is_some():
+        if self.mask_nu_offset.is_some() and mask_nu != init_mask_nu:
             self.aligned_write_cfg_mask_nu(init_mask_nu)
 
 
