@@ -300,6 +300,9 @@ class Worker:
     async def analyze(self):
         await self._worker_action({"action": "analyze"})
 
+    async def pre_examine(self):
+        await self._create_process(logging.WARNING)
+
     async def examine(self, rid, file, timeout=20.0):
         self.rid = rid
         self.filename = os.path.basename(file)

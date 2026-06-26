@@ -11,20 +11,45 @@ from artiq.master.worker import (Worker, WorkerInternalException,
                                  log_worker_exception)
 from artiq.tools import get_windows_drives, exc_to_warning
 
-
 logger = logging.getLogger(__name__)
 
 
 class _RepoScanner:
-    def __init__(self, worker_handlers):
+    def __init__(self, worker_handlers, pool_size=5):
         self.worker_handlers = worker_handlers
-        self.worker = None
+        self.workers = asyncio.Queue(maxsize=pool_size-1)
+        self.pool_refill_en = False
+        self.pool_refill_task = None
 
-    async def process_file(self, entry_dict, root, filename):
+    async def _refill_pool(self):
+        while self.pool_refill_en:
+            worker = Worker(self.worker_handlers)
+            await worker.pre_examine()
+            await self.workers.put(worker)
+
+    def start_pool(self):
+        self.pool_refill_en = True
+        self.pool_refill_task = asyncio.create_task(self._refill_pool())
+
+    async def stop_pool(self):
+        self.pool_refill_en = False
+        while True:
+            try:
+                await (self.workers.get_nowait()).close()
+            except asyncio.QueueEmpty:
+                break
+        await self.pool_refill_task
+        self.pool_refill_task = None
+        while True:
+            try:
+                await (self.workers.get_nowait()).close()
+            except asyncio.QueueEmpty:
+                break
+
+    async def process_file(self, worker, entry_dict, root, filename):
         logger.debug("processing file %s %s", root, filename)
         try:
-            description = await self.worker.examine(
-                "scan", os.path.join(root, filename))
+            description = await worker.examine("scan", os.path.join(root, filename))
         except:
             log_worker_exception()
             raise
@@ -52,35 +77,27 @@ class _RepoScanner:
             }
             entry_dict[name] = entry
 
-    async def _scan(self, root, subdir=""):
+    async def scan(self, root, subdir=""):
         entry_dict = dict()
         for de in os.scandir(os.path.join(root, subdir)):
             if de.name.startswith("."):
                 continue
             if de.is_file() and de.name.endswith(".py"):
                 filename = os.path.join(subdir, de.name)
+                worker = await self.workers.get()
                 try:
-                    await self.process_file(entry_dict, root, filename)
+                    await self.process_file(worker, entry_dict, root, filename)
                 except Exception as exc:
                     logger.warning("Skipping file '%s'", filename,
                         exc_info=not isinstance(exc, WorkerInternalException))
-                    # restart worker
-                    await self.worker.close()
-                    self.worker = Worker(self.worker_handlers)
+                finally:
+                    await worker.close()
             if de.is_dir():
-                subentries = await self._scan(
+                subentries = await self.scan(
                     root, os.path.join(subdir, de.name))
                 entries = {de.name + "/" + k: v for k, v in subentries.items()}
                 entry_dict.update(entries)
         return entry_dict
-
-    async def scan(self, root, subdir=""):
-        self.worker = Worker(self.worker_handlers)
-        try:
-            r = await self._scan(root, subdir)
-        finally:
-            await self.worker.close()
-        return r
 
 
 class ExperimentDB:
@@ -117,8 +134,12 @@ class ExperimentDB:
             self.cur_rev = new_cur_rev
             self.status["cur_rev"] = new_cur_rev
             t1 = time.monotonic()
-            new_explist = await _RepoScanner(self.worker_handlers).scan(
-                wd, self.experiment_subdir)
+            repo_scanner = _RepoScanner(self.worker_handlers)
+            repo_scanner.start_pool()
+            try:
+                new_explist = await repo_scanner.scan(wd, self.experiment_subdir)
+            finally:
+                await repo_scanner.stop_pool()
             logger.info("repository scan took %d seconds", time.monotonic()-t1)
             update_from_dict(self.explist, new_explist)
         finally:

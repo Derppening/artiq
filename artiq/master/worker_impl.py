@@ -205,31 +205,25 @@ class ExamineDatasetMgr:
 
 
 def examine(device_mgr, dataset_mgr, file):
-    previous_keys = set(sys.modules.keys())
-    try:
-        module = tools.file_import(file)
-        for class_name, exp_class in inspect.getmembers(module, is_public_experiment):
-            if exp_class.__doc__ is None:
-                name = class_name
-            else:
-                name = exp_class.__doc__.strip().splitlines()[0].strip()
-                if name[-1] == ".":
-                    name = name[:-1]
-            argument_mgr = TraceArgumentManager()
-            scheduler_defaults = {}
-            exp_class((device_mgr, dataset_mgr, argument_mgr, scheduler_defaults))
-            arginfo = OrderedDict(
-                (k, (proc.describe(), group, tooltip))
-                for k, (proc, group, tooltip) in argument_mgr.requested_args.items()
-            )
-            argument_ui = None
-            if hasattr(exp_class, "argument_ui"):
-                argument_ui = exp_class.argument_ui
-            register_experiment(class_name, name, arginfo, argument_ui, scheduler_defaults)
-    finally:
-        new_keys = set(sys.modules.keys())
-        for key in new_keys - previous_keys:
-            del sys.modules[key]
+    module = tools.file_import(file)
+    for class_name, exp_class in inspect.getmembers(module, is_public_experiment):
+        if exp_class.__doc__ is None:
+            name = class_name
+        else:
+            name = exp_class.__doc__.strip().splitlines()[0].strip()
+            if name[-1] == ".":
+                name = name[:-1]
+        argument_mgr = TraceArgumentManager()
+        scheduler_defaults = {}
+        exp_class((device_mgr, dataset_mgr, argument_mgr, scheduler_defaults))
+        arginfo = OrderedDict(
+            (k, (proc.describe(), group, tooltip))
+            for k, (proc, group, tooltip) in argument_mgr.requested_args.items()
+        )
+        argument_ui = None
+        if hasattr(exp_class, "argument_ui"):
+            argument_ui = exp_class.argument_ui
+        register_experiment(class_name, name, arginfo, argument_ui, scheduler_defaults)
 
 
 class ArgumentManager(ProcessArgumentManager):
