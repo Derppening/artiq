@@ -7,7 +7,10 @@ The supported operating systems and ways to install ARTIQ are:
   * Windows, using the MSYS2 software distribution
   * OpenBSD, using the native ports system
 
-However, ARTIQ is designed with portability in mind, and the community has found other ways to install all or parts of ARTIQ on other systems, for example on macOS or WSL. Search the forum for details. This manual describes the supported ways.
+However, ARTIQ is designed with portability in mind, and the community has found other ways to install all or parts of ARTIQ on other systems, for example on macOS or WSL. Search `the ARTIQ/Sinara forum <https://forum.m-labs.hk/>`_ for details. The officially supported methods are described here.
+
+.. warning::
+  Before following these instructions, make sure that you know whether you want to install the beta, stable, or legacy versions of ARTIQ. Major versions are not interchangeable. In particular, your software version should match the gateware version of the core device you intend to use. See also :doc:`releases` for a description of the ARTIQ release model.
 
 Installing via Nix (Linux)
 --------------------------
@@ -183,7 +186,7 @@ This will set your user as a trusted user, allowing you to specify untrusted sub
 Installing via MSYS2 (Windows)
 ------------------------------
 
-We recommend using our `offline installer <https://nixbld.m-labs.hk/job/artiq/extra-beta/msys2-offline-installer/latest>`_, which contains all the necessary packages and requires no additional configuration. After installation, simply launch ``MSYS2 with ARTIQ`` from the Windows Start menu.
+M-Labs recommends using our own `offline installer <https://nixbld.m-labs.hk/job/artiq/extra-beta/msys2-offline-installer/latest>`_, which contains all the necessary packages and requires no additional configuration. After installation, simply launch ``MSYS2 with ARTIQ`` from the Windows Start menu.
 
 Alternatively, you may install `MSYS2 <https://msys2.org>`_, then edit ``C:\msys64\etc\pacman.conf`` and add at the end: ::
 
@@ -213,18 +216,45 @@ Upgrading ARTIQ
 ---------------
 
 .. note::
-    When you upgrade ARTIQ, as well as updating the software on your host machine, it may also be necessary to reflash the gateware and firmware of your core device (and in some cases the gateware and firmware of DRTIO peripherals) to keep them compatible. New numbered release versions in particular incorporate breaking changes and are not generally compatible. See :doc:`flashing` for instructions.
+  When you upgrade ARTIQ, as well as updating the software on your host machine, it may also be necessary to reflash the gateware and firmware of your core device (and in some cases the gateware and firmware of DRTIO peripherals) to keep them compatible. If you are using stable or legacy versions, this only applies to major version upgrades. When upgrading within a version, reflashing should never be necessary for compatibility. You might still chose to reflash to incorporate bugfixes to gateware or firmware, but this does not require a software upgrade.
+
+  If you are using a beta version of ARTIQ, minor version upgrades may also cover large changes and require reflashing. See :doc:`flashing`, and remember to back up legacy binaries if reproducability is important to you.
 
 Upgrading with Nix
 ^^^^^^^^^^^^^^^^^^
 
-Run ``$ nix profile upgrade`` if you installed ARTIQ into your user profile. If you use a ``flake.nix`` shell environment, make a back-up copy of the ``flake.lock`` file to enable rollback, then run ``$ nix flake update`` and re-enter the environment with ``$ nix shell``. If you use multiple flakes, each has its own ``flake.lock`` and can be updated or rolled back separately.
+For minor version upgrades, run ``$ nix profile upgrade`` if you installed ARTIQ into your user profile. If you use a ``flake.nix`` shell environment, make a back-up copy of the ``flake.lock`` file to enable rollback, then run ``$ nix flake update`` and re-enter the environment with ``$ nix shell``. If you use multiple flakes, each has its own ``flake.lock`` and can be updated or rolled back separately.
 
-To rollback to the previous version, respectively use ``$ nix profile rollback`` or restore the backed-up versions of the ``flake.lock`` files.
+To rollback to a previous version, respectively use ``$ nix profile rollback`` or restore the backed-up versions of the ``flake.lock`` files.
+
+For major version upgrades, regardless of installation method, it is generally necessary to update the source URL your installation references. The exception is upgrading your beta installation to a new beta installation after a major release; since the beta channel is not tied to a release number like the stable channels, you can simply follow the instructions for a minor version upgrade above.
+
+In profile installations, you will want to update the URL you used with ``nix profile install``; the easiest way to do this is simply by removing your existing installation and re-running ``nix profile install`` with the new source. To find the correct URL, it's best to check the installation instructions for your desired channel in an *up-to-date* version of the manual, but as a rule releases are specified as follows: ::
+
+  git+https://git.m-labs.hk/M-Labs/artiq.git?ref=release-<number>
+
+except to install the current beta, for which you can leave out ``?ref=release-<number>`` entirely.
+
+.. note::
+  Backing up a Nix profile install is less intuitive. One option is to run ``nix profile list``, find your ARTIQ installation, and save the URL labeled ``Locked flake URL``. This is the precise commit your current profile install is based on, and using this URL with ``nix profile install`` will recreate your current installation, regardless of future upgrades or version changes.
+
+If you use a ``flake.nix`` shell environment, you can update the source in the same way by adding or removing ``?ref=release-<number>`` from the line beginning with ``inputs.extrapkg.url``. Back up both ``flake.nix`` and ``flake.lock``, as ``flake.lock`` will be updated automatically. If you use multiple flakes, the source must be specified per flake; it is possible to use multiple ARTIQ versions in parallel by entering and exiting shells from different flakes.
 
 Upgrading with MSYS2
 ^^^^^^^^^^^^^^^^^^^^
 
 Run ``pacman -Syu`` to update all MSYS2 packages, including ARTIQ. If you get a message telling you that the shell session must be restarted after a partial update, open the shell again after the partial update and repeat the command. See the `MSYS2 <https://www.msys2.org/docs/updating/>`__ and `Pacman <https://wiki.archlinux.org/title/Pacman>`_ manuals for more information, including how to update individual packages if required.
 
-You may need to reflash the gateware and firmware of the core device to keep it synchronized with the software.
+MSYS2 installations are linked to channel, not to a numbered release, so if a new major version has been released, this will perform a major version upgrade. Alternatively, you may want to switch *channels;* to do this, re-download and run the installer for your desired channel. Respectively, the legacy installer can be found `here <https://nixbld.m-labs.hk/job/artiq/extra-legacy/msys2-offline-installer/latest>`_, the stable installer can be found `here <https://nixbld.m-labs.hk/job/artiq/extra/msys2-offline-installer/latest>`_, and the beta installer can be found `here <https://nixbld.m-labs.hk/job/artiq/extra-beta/msys2-offline-installer/latest>`_.
+
+Alternatively, you can update the server URL in ``C:\msys64\etc\pacman.conf``; the three channels are hosted at ::
+
+  https://msys2.m-labs.hk/artiq-legacy
+  https://msys2.m-labs.hk/artiq
+  https://msys2.m-labs.hk/artiq-beta
+
+Once you have changed servers, open a MSYS2 shell and run the command ::
+
+  $  pacman -Syuu
+
+to upgrade or downgrade all packages to the new channel.
