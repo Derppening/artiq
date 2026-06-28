@@ -58,10 +58,10 @@ Some things to consider:
 
     - Is the ``core_addr`` field of your ``device_db.py`` set correctly?
     - Did your device flash and boot successfully? Were the binaries generated for the correct board hardware version?
-    - Are your core device's IP address and networking configurations definitely set correctly? Check the UART log to confirm, and talk to your network administrator about what the correct choices are.
+    - Are your core device's IP address and further networking configuration values definitely set correctly? Check the UART log to confirm, and talk to your network administrator about what the correct choices are.
+    - In particular, are your PC and your crate in the same subnet? If not, have you set a default gateway? See :ref:`networking-details`, and again talk to your network administrator.
     - Is your core device configured for an external reference clock? If so, it cannot function correctly without one. Is the external reference clock plugged in?
     - Are Ethernet and (on Kasli only) SFP0 plugged in all the way? Are they working? Try different cables and SFP adapters; M-Labs tests with CAT6 cables, but lower categories should be supported too.
-    - Are your PC and your crate in the same subnet?
     - Is some other device in your network already using the configured IP address? Turn off the core device and try pinging the configured IP address; if it responds, you have a culprit. One of the two will need a different networking configuration.
     - Are there restrictions or issues in your router or subnet that are preventing the core device from connecting? It may help to try connecting the core device to your PC directly.
 

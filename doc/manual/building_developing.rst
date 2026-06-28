@@ -217,7 +217,7 @@ Otherwise:
 
 4. Power the board back on.
 
-Optionally, the SD card may also be loaded at the same time with an additional file ``config.txt``, which can contain preset configuration values in the format ``key=value``, one per line. The keys are those used with :mod:`~artiq.frontend.artiq_coremgmt`. This allows e.g. presetting an IP address and any other configuration information.
+Optionally, the SD card may also be loaded with a ``config.txt``, containing configuration values in the format ``key=value``, one per line, as described in :ref:`configuration-storage`. This allows e.g. presetting an IP address for the board to use.
 
 After a successful boot, the "FPGA DONE" light should be illuminated and the board should respond to ping when plugged into Ethernet.
 

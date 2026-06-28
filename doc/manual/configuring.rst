@@ -16,13 +16,13 @@ You can also insert other types of SFP transceivers into Kasli if you wish to us
 IP address and ping
 ^^^^^^^^^^^^^^^^^^^
 
-If you purchased a Kasli or Kasli-SoC device from M-Labs, it will arrive with an IP address already set, normally the address requested in the web shop at time of purchase. If you did not specify an address at purchase, the default IP M-Labs uses is ``192.168.1.75``. If you did not obtain your hardware from M-Labs, or if you have just reflashed your core device, see :ref:`networking-tips` below.
+If you purchased a Kasli or Kasli-SoC device from M-Labs, it will arrive with an IP address already set, normally the address requested in the web shop at time of purchase. If you did not specify an address at purchase, the default IP M-Labs uses is ``192.168.1.75``. If you did not obtain your hardware from M-Labs, or if you have just reflashed your core device, see :ref:`default-ip` below.
 
 Once you know the IP, check that you can ping your device: ::
 
   $ ping <IP_address>
 
-If ping fails, check that the Ethernet LED is ON; on Kasli, it is the LED next to the SFP0 connector. As a next step, try connecting to the serial port to read the UART log. See :ref:`connecting-UART`.
+A variety of issues with crate setup tend to make themselves apparent at this step, so if ping fails or :mod:`~artiq.frontend.artiq_coremgmt` cannot connect to the device, some troubleshooting may be required. First, check that the Ethernet LED is ON; on Kasli, it is the LED next to the SFP0 connector. Try connecting to the serial port to read the UART log, as in :ref:`connecting-UART`, and check that the core device is booting correctly and the networking options are set as you expect. For more steps, see also :ref:`FAQ: how do I troubleshoot networking problems? <faq-networking>`
 
 Core management tool
 ^^^^^^^^^^^^^^^^^^^^
@@ -48,32 +48,23 @@ and then rebooting the device: ::
 
 Make sure to correspondingly edit your ``device_db.py`` after rebooting.
 
-.. _networking-tips:
+.. _default-ip:
 
-Tips and troubleshooting
-^^^^^^^^^^^^^^^^^^^^^^^^
-For Kasli-SoC:
-    If the ``ip`` config is not set, Kasli-SoC firmware defaults to using the IP address ``192.168.1.56``.
+DHCP and default addresses
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-For ZC706:
-    If the ``ip`` config is not set, ZC706 firmware defaults to using the IP address ``192.168.1.52``.
+Kasli and KC705 devices can be configured to use DHCP to obtain an IP address and default gateway. This is done by setting the ``ip`` config value to ``use_dhcp``, which is also the default if no IP address has been set. The chosen IP address will be in log output, which can be accessed via the  :ref:`UART log <connecting-UART>`.
 
-For EBAZ4205:
-    If the ``ip`` config is not set, EBAZ4205 firmware defaults to using the IP address ``192.168.1.57``.
+.. tip::
+  If a static IP address is required and :mod:`~artiq.frontend.artiq_coremgmt` can't be used, ``ip`` (and other configuration keys) can be set by flash with :mod:`~artiq.frontend.artiq_mkfs` and :mod:`~artiq.frontend.artiq_flash`. See :ref:`config-no-network`.
 
-For Kasli or KC705:
-    If the ``ip`` config field is not set or set to ``use_dhcp``, the device will attempt to obtain an IP address and default gateway using DHCP. The chosen IP address will be in log output, which can be accessed via the :ref:`UART log <connecting-UART>`.
+On other core devices the default IP addresses are static, as follows:
 
-    If a static IP address is preferred, it can be flashed directly (OpenOCD must be installed and configured, as in :doc:`flashing`), along with, as necessary, default gateway, IPv6, and/or MAC address: ::
+For Kasli-SoC: ``192.168.1.56``.
 
-        $ artiq_mkfs flash_storage.img [-s mac xx:xx:xx:xx:xx:xx] [-s ip xx.xx.xx.xx/xx] [-s ip_default_route xx.xx.xx.xx] [-s ip6 xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx/xx] [-s ip6_default_route xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx]
-        $ artiq_flash write=storage start -t [board] -V [variant] -f flash_storage.img
+For ZC706: ``192.168.1.52``.
 
-On Kasli or Kasli-SoC devices, specifying the MAC address is unnecessary, as they can obtain it from their EEPROM. If you only want to access the core device from the same subnet, default gateway and IPv4 prefix length may also be omitted. On any board, once a device can be reached by :mod:`~artiq.frontend.artiq_coremgmt`, these values can be set and edited at any time, following the procedure for IP above.
-
-Regarding IPv6, note that the device also has a link-local address that corresponds to its EUI-64, which can be used simultaneously to the (potentially unrelated) IPv6 address defined by using the ``ip6`` configuration key.
-
-If problems persist, see the :ref:`network troubleshooting <faq-networking>` section of the FAQ.
+For EBAZ4205: ``192.168.1.57``.
 
 .. _core-device-config:
 
@@ -82,6 +73,21 @@ Configuring the core device
 
 .. note::
   The following steps are optional, and you only need to execute them if they are necessary for your specific system. To learn more about how ARTIQ works and how to use it first, you might skip to the first tutorial page, :doc:`rtio`. For all configuration options, the core device generally must be restarted for changes to take effect.
+
+.. _networking-details:
+
+Detailed networking options
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Besides ``ip``, which expects an IPv4 address, ARTIQ core devices also support setting an IPv6 address via the key ``ipv6``. These addresses are independent and can be used simultaneously. Note that each core device also possesses a link-local address corresponding to its EUI-64, which is unrelated to networking configuration and can also be used separately.
+
+If you would like to be able to access the core device from outside of its subnet, the ``ip_default_route`` key should be set to the IP address of a default gateway. Additionally, the ``ip`` key should be set to a network prefix rather than a simple address, for example: ::
+
+  $ artiq_coremgmt config write -s ip 192.168.1.75/24 -s ip_default_route 192.168.1.0
+
+The equivalent key for ipv6 is ``ipv6_default_route``.
+
+It is also possible to manually set the core device's MAC address, though on Kasli or Kasli-SoC devices this is unnecessary, as they can obtain it from EEPROM. The corresponding key is ``mac``.
 
 Flash idle and/or startup kernel
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
