@@ -12,6 +12,8 @@ However, ARTIQ is designed with portability in mind, and the community has found
 .. warning::
   Before following these instructions, make sure that you know whether you want to install the beta, stable, or legacy versions of ARTIQ. Major versions are not interchangeable. In particular, your software version should match the gateware version of the core device you intend to use. See also :doc:`releases` for a description of the ARTIQ release model.
 
+  This is the **beta** version of the manual, and these instructions will install the ARTIQ beta, which is currently **ARTIQ-10**.
+
 Installing via Nix (Linux)
 --------------------------
 
