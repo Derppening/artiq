@@ -1,4 +1,5 @@
 from numpy import int32, int64
+from typing import Generic
 
 from artiq.coredevice.ad9910 import (
     _AD9910_REG_FTW,
@@ -7,7 +8,7 @@ from artiq.coredevice.ad9910 import (
     DEFAULT_PROFILE,
     RAM_DEST_FTW,
     RAM_MODE_RAMPUP,
-    SyncDataUser,
+    SyncDataT,
 )
 from artiq.coredevice.core import Core
 from artiq.coredevice.urukul import (
@@ -28,10 +29,10 @@ DDS = "urukul_ch0"
 
 
 @compile
-class AD9910Exp(EnvExperiment):
+class AD9910Exp(EnvExperiment, Generic[SyncDataT]):
     core: KernelInvariant[Core]
     cpld: KernelInvariant[UrukulCPLD[Auto]]
-    dev: KernelInvariant[AD9910[SyncDataUser]]
+    dev: KernelInvariant[AD9910[SyncDataT]]
     io_update_device: Kernel[bool]
 
     def build(self, runner, io_update_device=True):

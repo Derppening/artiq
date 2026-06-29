@@ -2,13 +2,15 @@ from functools import wraps
 
 from numpy import int32, int64
 
+from typing import Generic
+
 from artiq.coredevice.ad9910 import (
     _AD9910_REG_ASF,
     _AD9910_REG_RAMP_LIMIT,
     _AD9910_REG_RAMP_RATE,
     _AD9910_REG_RAMP_STEP,
     AD9910,
-    SyncDataUser,
+    SyncDataT,
 )
 from artiq.coredevice.core import Core
 from artiq.coredevice.urukul import CPLD as UrukulCPLD
@@ -91,11 +93,11 @@ def io_update_device(cpld, *required_values, proto_rev=None):
 
 
 @compile
-class AD9910WaveformExp(EnvExperiment):
+class AD9910WaveformExp(EnvExperiment, Generic[SyncDataT]):
     core: KernelInvariant[Core]
     cpld: KernelInvariant[UrukulCPLD[Auto]]
-    dds1: KernelInvariant[AD9910[SyncDataUser]]
-    dds2: KernelInvariant[AD9910[SyncDataUser]]
+    dds1: KernelInvariant[AD9910[SyncDataT]]
+    dds2: KernelInvariant[AD9910[SyncDataT]]
     io_update_device: Kernel[bool]
     multiple_profiles: Kernel[bool]
     osk_manual: Kernel[bool]
