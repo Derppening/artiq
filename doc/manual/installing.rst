@@ -1,6 +1,9 @@
 Installing ARTIQ
 ================
 
+.. Version-specific data is substituted from 'version_specific' dict in conf.py
+.. For a new branch or major version release, edit the values there!
+
 The supported operating systems and ways to install ARTIQ are:
 
   * Linux, using the Nix package manager
@@ -12,7 +15,7 @@ However, ARTIQ is designed with portability in mind, and the community has found
 .. warning::
   Before following these instructions, make sure that you know whether you want to install the beta, stable, or legacy versions of ARTIQ. Major versions are not interchangeable. In particular, your software version should match the gateware version of the core device you intend to use. See also :doc:`releases` for a description of the ARTIQ release model.
 
-  This is the **beta** version of the manual, and these instructions will install the ARTIQ beta, which is currently **ARTIQ-10**.
+  This is the **|channel|** version of the manual, and these instructions will install |channel| ARTIQ, which is currently **ARTIQ-|major_version|**.
 
 Installing via Nix (Linux)
 --------------------------
@@ -31,7 +34,7 @@ User environment installation
 
 There are few options for accessing ARTIQ through Nix. The easiest way is to install it into the user environment: ::
 
-  $ nix profile install git+https://git.m-labs.hk/M-Labs/artiq.git
+  $ nix profile install |artiq_flake|
 
 Answer "Yes" to the questions about setting Nix configuration options (for more details see :ref:`installing-details` below.) You should now have a minimal installation of ARTIQ, where the usual front-end commands (:mod:`~artiq.frontend.artiq_run`, :mod:`~artiq.frontend.artiq_master`, :mod:`~artiq.frontend.artiq_dashboard`, etc.) are all available to you.
 
@@ -45,7 +48,7 @@ Flake custom environments
 Modifying the environment and making additional packages visible to the ARTIQ commands requires using the Nix language and writing your own flake. Create an empty directory with a file ``flake.nix`` containing the following: ::
 
   {
-    inputs.extrapkg.url = "git+https://git.m-labs.hk/M-Labs/artiq-extrapkg.git";
+    inputs.extrapkg.url = "|extrapkg_flake|";
     outputs = { self, extrapkg }:
       let
         pkgs = extrapkg.pkgs;
@@ -188,13 +191,13 @@ This will set your user as a trusted user, allowing you to specify untrusted sub
 Installing via MSYS2 (Windows)
 ------------------------------
 
-M-Labs recommends using our own `offline installer <https://nixbld.m-labs.hk/job/artiq/extra-beta/msys2-offline-installer/latest>`_, which contains all the necessary packages and requires no additional configuration. After installation, simply launch ``MSYS2 with ARTIQ`` from the Windows Start menu.
+M-Labs recommends using our own `offline installer <|msys2_installer_link|>`_, which contains all the necessary packages and requires no additional configuration. After installation, simply launch ``MSYS2 with ARTIQ`` from the Windows Start menu.
 
 Alternatively, you may install `MSYS2 <https://msys2.org>`_, then edit ``C:\msys64\etc\pacman.conf`` and add at the end: ::
 
     [artiq]
     SigLevel = Optional TrustAll
-    Server = https://msys2.m-labs.hk/artiq-beta
+    Server = |msys2_server|
 
 Launch ``MSYS2 CLANG64`` from the Windows Start menu to open the MSYS2 shell, and enter the following commands: ::
 
@@ -225,9 +228,9 @@ Upgrading ARTIQ
 Upgrading with Nix
 ^^^^^^^^^^^^^^^^^^
 
-For minor version upgrades, run ``$ nix profile upgrade`` if you installed ARTIQ into your user profile. If you use a ``flake.nix`` shell environment, make a back-up copy of the ``flake.lock`` file to enable rollback, then run ``$ nix flake update`` and re-enter the environment with ``$ nix shell``. If you use multiple flakes, each has its own ``flake.lock`` and can be updated or rolled back separately.
+For minor version upgrades, run ``nix profile upgrade`` if you installed ARTIQ into your user profile. If you use a ``flake.nix`` shell environment, make a back-up copy of the ``flake.lock`` file to enable rollback, then run ``nix flake update`` and re-enter the environment with ``nix shell``. If you use multiple flakes, each has its own ``flake.lock`` and can be updated or rolled back separately.
 
-To rollback to a previous version, respectively use ``$ nix profile rollback`` or restore the backed-up versions of the ``flake.lock`` files.
+To rollback to a previous version, respectively use ``nix profile rollback`` or restore the backed-up versions of the ``flake.lock`` files.
 
 For major version upgrades, regardless of installation method, it is generally necessary to update the source URL your installation references. The exception is upgrading your beta installation to a new beta installation after a major release; since the beta channel is not tied to a release number like the stable channels, you can simply follow the instructions for a minor version upgrade above.
 

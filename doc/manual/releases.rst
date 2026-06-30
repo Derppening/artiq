@@ -9,4 +9,7 @@ To install the current stable version of ARTIQ, consult the *current* `Installin
 
 The beta manual is hosted `here <https://m-labs.hk/artiq/manual-beta/>`_. The current manual is hosted `here <https://m-labs.hk/artiq/manual/>`__. The legacy manual is hosted `here <https://m-labs.hk/artiq/manual-legacy/>`__. Older versions of the manual can be rebuilt from the source files in ``doc/manual``, retrieved from the respective branch.
 
+.. attention::
+    This is the **|channel|** manual, currently documenting **ARTIQ-|major_version|**.
+
 .. include:: ../../RELEASE_NOTES.rst
