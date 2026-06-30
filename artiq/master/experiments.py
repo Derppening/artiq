@@ -200,9 +200,17 @@ class FilesystemBackend:
 
 class _GitCheckout:
     def __init__(self, git, rev):
+        # lazy import - make dependency optional
+        import pygit2
+
         self.path = tempfile.mkdtemp()
         commit = git.get(rev)
-        git.checkout_tree(commit, directory=self.path)
+        git.checkout_tree(
+            commit,
+            directory=self.path,
+            strategy=(pygit2.GIT_CHECKOUT_FORCE
+                      | pygit2.GIT_CHECKOUT_DONT_UPDATE_INDEX),
+        )
         self.message = commit.message.strip()
         self.ref_count = 1
         logger.info("checked out revision %s into %s", rev, self.path)
