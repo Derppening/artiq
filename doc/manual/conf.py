@@ -10,8 +10,8 @@
 
 import sys
 import os
-from unittest.mock import Mock
 
+sys.path.insert(0, os.path.abspath('../..'))
 from artiq import __version__ as artiq_version
 
 # Version-specific data is centralized here
@@ -32,6 +32,7 @@ def versioneer(app, docname, source):
 def setup(app):
     app.connect("source-read", versioneer)
 
+from unittest.mock import Mock
 import sphinx_rtd_theme
 
 # we cannot use autodoc_mock_imports (does not help with argparse)
@@ -53,11 +54,6 @@ class MockApplets:
         pass
 
 sys.modules["artiq.gui.applets"] = MockApplets
-
-# If extensions (or modules to document with autodoc) are in another directory,
-# add these directories to sys.path here. If the directory is relative to the
-# documentation root, use os.path.abspath to make it absolute, like shown here.
-sys.path.insert(0, os.path.abspath('../..'))
 
 # -- General configuration ------------------------------------------------
 
