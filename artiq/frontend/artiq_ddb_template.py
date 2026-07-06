@@ -156,7 +156,8 @@ class PeripheralManager:
             "clkgen": "TTLClockGen"
         }
         dios = []
-        if peripheral.get("board", "") != "RJ45_LVDS":
+        board = peripheral.get("board", "")
+        if board != "RJ45_LVDS":
             for i in range(num_channels):
                 classes = [
                     class_names[peripheral["bank_direction_low"]],
@@ -169,15 +170,20 @@ class PeripheralManager:
                 dios.append((self.get_name("ttl"), class_names[ch_direction]))
         channel = count(0)
         for name, class_name in dios:
+            if board == "RJ45_LVDS":
+                board_entry = '\n    "board": "RJ45_LVDS",'
+            else:
+                board_entry = ""
             self.gen("""
                 device_db["{name}"] = {{
                     "type": "local",
                     "module": "artiq.coredevice.ttl",
-                    "class": "{class_name}",
+                    "class": "{class_name}", {board_entry}
                     "arguments": {{"channel": 0x{channel:06x}}}
                 }}""",
                 name=name,
                 class_name=class_name,
+                board_entry=board_entry,
                 channel=rtio_offset + next(channel))
         if peripheral["edge_counter"]:
             for name, class_name in dios:

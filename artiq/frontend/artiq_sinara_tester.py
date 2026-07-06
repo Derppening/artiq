@@ -81,6 +81,8 @@ class SinaraTester(EnvExperiment):
         self.leds = dict()
         self.ttl_outs = dict()
         self.ttl_ins = dict()
+        self.lvds_outs = dict()
+        self.lvds_ins = dict()
         self.urukul_cplds = dict()
         self.urukuls = dict()
         self.samplers = dict()
@@ -108,10 +110,16 @@ class SinaraTester(EnvExperiment):
                     dev = self.get_device(name)
                     if "led" in name:  # guess
                         self.leds[name] = dev
+                    elif desc.get("board", "") == "RJ45_LVDS":
+                        self.lvds_outs[name] = dev
                     else:
                         self.ttl_outs[name] = dev
                 elif (module, cls) == ("artiq.coredevice.ttl", "TTLInOut"):
-                    self.ttl_ins[name] = self.get_device(name)
+                    dev = self.get_device(name)
+                    if desc.get("board", "") == "RJ45_LVDS":
+                        self.lvds_ins[name] = dev
+                    else:
+                        self.ttl_ins[name] = dev
                 elif (module, cls) == ("artiq.coredevice.urukul", "CPLD"):
                     self.urukul_cplds[name] = self.get_device(name)
                 elif (module, cls) == ("artiq.coredevice.ad9910", "AD9910"):
@@ -211,6 +219,8 @@ class SinaraTester(EnvExperiment):
         self.leds = sorted(self.leds.items(), key=lambda x: x[1].channel)
         self.ttl_outs = sorted(self.ttl_outs.items(), key=lambda x: x[1].channel)
         self.ttl_ins = sorted(self.ttl_ins.items(), key=lambda x: x[1].channel)
+        self.lvds_outs = sorted(self.lvds_outs.items(), key=lambda x: x[1].channel)
+        self.lvds_ins = sorted(self.lvds_ins.items(), key=lambda x: x[1].channel)
         self.urukuls = sorted(self.urukuls.items(), key=lambda x: (x[1].cpld.bus.channel, x[1].chip_select))
         self.samplers = sorted(self.samplers.items(), key=lambda x: x[1].cnv.channel)
         self.zotinos = sorted(self.zotinos.items(), key=lambda x: x[1].bus.channel)
@@ -300,6 +310,31 @@ class SinaraTester(EnvExperiment):
                   .format(ttl_out_name, ttl_in_name))
             input()
             if self.test_ttl_in(ttl_out_dev, ttl_in_dev):
+                print("PASSED")
+            else:
+                print("FAILED")
+
+    def test_lvds_outs(self):
+        print("*** Testing LVDS outputs.")
+        print("Touch each RJ45 pin with the oscilloscope probe tip, and check for 1 pulse.")
+        print("Press ENTER when done.")
+        for name, dev in self.lvds_outs:
+            print("Testing LVDS output: {}.".format(name))
+            self.test_ttl_out_chunk([dev])
+                                    
+    def test_lvds_ins(self):
+        print("*** Testing LVDS inputs.")
+        default_lvds_out_name, default_lvds_out_dev = next(iter(self.lvds_outs))
+        lvds_out_name = input("LVDS device to use as stimulus (default: {}):".format(default_lvds_out_name))
+        if lvds_out_name:
+            lvds_out_dev = self.get_device(lvds_out_name)
+        else:
+            lvds_out_name, lvds_out_dev = default_lvds_out_name, default_lvds_out_dev
+        for lvds_in_name, lvds_in_dev in self.lvds_ins:
+            print("Connect {} to {}. Press ENTER when done."
+                    .format(lvds_in_name, lvds_out_name))
+            input()
+            if self.test_ttl_in(lvds_out_dev, lvds_in_dev):
                 print("PASSED")
             else:
                 print("FAILED")
