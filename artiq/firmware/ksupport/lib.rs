@@ -115,6 +115,7 @@ mod api;
 mod rtio;
 mod nrt_bus;
 mod cxp;
+mod refcounting;
 
 static mut LIBRARY: Option<Library<'static>> = None;
 static mut ALLOC: alloc_list::ListAlloc = alloc_list::EMPTY;
@@ -384,13 +385,14 @@ extern fn dma_record_output(target: i32, word: i32) {
     }
 }
 
-extern fn dma_record_output_wide(target: i32, words: &CSlice<i32>) {
+extern fn dma_record_output_wide(target: i32, words: &refcounting::List<i32>) {
+    let words = words.as_slice();
     assert!(words.len() <= 16); // enforce the hardware limit
 
     unsafe {
         let timestamp = ((csr::rtio::now_hi_read() as i64) << 32) | (csr::rtio::now_lo_read() as i64);
         let mut data = dma_record_output_prepare(timestamp, target, words.len());
-        for word in words.as_ref().iter() {
+        for word in words.iter() {
             data[..4].copy_from_slice(&[
                 (word >>  0) as u8,
                 (word >>  8) as u8,
