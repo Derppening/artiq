@@ -7,7 +7,7 @@ pub struct TimestampedData {
 #[cfg(has_rtio)]
 mod imp {
     use core::ptr::{read_volatile, write_volatile};
-    use cslice::CSlice;
+    use refcounting::List;
     use rtio::TimestampedData;
 
     use board_misoc::csr;
@@ -89,7 +89,8 @@ mod imp {
         }
     }
 
-    pub extern fn output_wide(target: i32, data: &CSlice<i32>) {
+    pub extern fn output_wide(target: i32, data: &List<i32>) {
+        let data = data.as_slice();
         unsafe {
             csr::rtio::target_write(target as u32);
             // writing target clears o_data
@@ -216,7 +217,7 @@ mod imp {
 
 #[cfg(not(has_rtio))]
 mod imp {
-    use cslice::CSlice;
+    use refcounting::List;
     use rtio::TimestampedData;
 
     pub extern fn init() {
@@ -235,7 +236,7 @@ mod imp {
         unimplemented!("not(has_rtio)")
     }
 
-    pub extern fn output_wide(_target: i32, _data: &CSlice<i32>) {
+    pub extern fn output_wide(_target: i32, _data: &List<i32>) {
         unimplemented!("not(has_rtio)")
     }
 
