@@ -1,11 +1,10 @@
 use core::{fmt, str};
 
 use byteorder::{ByteOrder, NetworkEndian};
-use cslice::CMutSlice;
 use io::{Cursor, Write};
 use proto_artiq::drtioaux_proto::CXP_PAYLOAD_MAX_SIZE;
 
-use crate::{recv, send, Message};
+use crate::{recv, refcounting::List, send, Message};
 
 const URL_BUF_SIZE: usize = 256;
 const ROI_MAX_SIZE: usize = 4096;
@@ -225,7 +224,7 @@ fn drtio_read_bytes(dest: u8, addr: u32, bytes: &mut [u8]) {
     })
 }
 
-pub extern "C" fn download_xml_file(dest: i32, buffer: &mut CMutSlice<i32>) -> i32 {
+pub extern "C" fn download_xml_file(dest: i32, buffer: &mut List<i32>) -> i32 {
     match dest {
         0 => {
             raise!("CXPError", "CXP Grabber is not available on destination 0");
@@ -306,18 +305,18 @@ pub extern "C" fn start_roi_viewer(dest: i32, x0: i32, y0: i32, x1: i32, y1: i32
 
 pub extern "C" fn download_roi_viewer_frame(
     dest: i32,
-    buffer: &mut CMutSlice<i64>,
+    buffer: &mut List<i64>,
 ) -> ROIViewerFrame {
-    if buffer.len() * 4 < ROI_MAX_SIZE {
+    let buf = buffer.as_mut_slice();
+    if buf.len() * 4 < ROI_MAX_SIZE {
         // each pixel is 16 bits
         let msg_buf = ErrMsgBuffer::from(Error::BufferSizeTooSmall(
             ROI_MAX_SIZE * 2,
-            buffer.len() * 8,
+            buf.len() * 8,
         ));
         raise!("CXPError", msg_buf.as_str());
     };
 
-    let buf = buffer.as_mut_slice();
     let (width, height, pixel_code);
     match dest {
         0 => {
