@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from math import ceil, log2
-from numpy import int32, int64
+from numpy import int32, int64, uint32
 from typing import Generic, TypeVar
 
 from artiq.language.core import *
@@ -252,13 +252,13 @@ class SharedDDS(Generic[SyncDataT]):
         raise ValueError("IO_UPDATE-SYNC_CLK alignment edges are too broad")
 
     @portable
-    def frequency_to_ftw(self, frequency: float) -> int32:
+    def frequency_to_ftw(self, frequency: float) -> uint32:
         """Return the 32-bit frequency tuning word corresponding to the given
         frequency."""
         return self._inner_dds.frequency_to_ftw(frequency)
 
     @portable
-    def turns_to_pow(self, turns: float) -> int32:
+    def turns_to_pow(self, turns: float) -> uint32:
         """Return the 16-bit phase offset word corresponding to the given phase
         in turns."""
         return self._inner_dds.turns_to_pow(turns)
@@ -683,7 +683,7 @@ class Channel(Generic[SyncDataT]):
         self.servo.write(addr + 1, 0)
 
     @kernel
-    def get_tracked_phase_accumulator(self) -> int32:
+    def get_tracked_phase_accumulator(self) -> uint32:
         """Reads the tracked phase accumulator of this channel.
         The tracked phase accumulator is an internal register that tracks the
         corresponding register of the corresponding DDS. Both registers are
@@ -699,7 +699,7 @@ class Channel(Generic[SyncDataT]):
         lo = self.servo.read(addr)
         self.core.break_realtime()
         hi = self.servo.read(addr + 1)
-        return (hi << 16) | (lo & 0xffff)
+        return uint32((hi << 16) | (lo & 0xffff))
 
     @kernel
     def clear_tracked_ftw(self):
@@ -713,7 +713,7 @@ class Channel(Generic[SyncDataT]):
         self.servo.write(addr + 1, 0)
 
     @kernel
-    def get_tracked_ftw(self) -> int32:
+    def get_tracked_ftw(self) -> uint32:
         """Reads the tracked frequency tuning word (FTW) of this channel.
 
         :return: The internally tracked FTW
@@ -723,10 +723,10 @@ class Channel(Generic[SyncDataT]):
         lo = self.servo.read(addr)
         self.core.break_realtime()
         hi = self.servo.read(addr + 1)
-        return (hi << 16) | (lo & 0xffff)
+        return uint32((hi << 16) | (lo & 0xffff))
 
     @kernel
-    def set_dds_mu(self, profile: int32, ftw: int32, offs: int32, pow_: int32 = 0):
+    def set_dds_mu(self, profile: int32, ftw: uint32, offs: int32, pow_: uint32 = uint32(0)):
         """Set profile DDS coefficients in machine units.
 
         See also :meth:`Channel.set_dds`.
@@ -737,10 +737,10 @@ class Channel(Generic[SyncDataT]):
         :param pow_: Phase offset word (16-bit)
         """
         base = ((self.servo_channel << PROFILE_WIDTH) | profile) << 3
-        self.servo.write(base + 6, ftw >> 16)
-        self.servo.write(base + 2, (ftw & 0xffff))
+        self.servo.write(base + 6, int32(ftw >> 16))
+        self.servo.write(base + 2, int32(ftw & uint32(0xffff)))
         self.set_dds_offset_mu(profile, offs)
-        self.servo.write(base, pow_)
+        self.servo.write(base, int32(pow_))
 
     @kernel
     def set_dds(self, profile: int32, frequency: float, offset: float, phase: float = 0.):

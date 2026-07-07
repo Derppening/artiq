@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Generic, TypeVar
-from numpy import int32, int64
+from numpy import int32, int64, uint32
 
 from artiq.language.core import *
 from artiq.language.units import us, ms
@@ -361,7 +361,7 @@ class AD9910(Generic[SyncDataT]):
         self.bus.write(data_low)
 
     @kernel
-    def write_ram(self, data: list[int32]):
+    def write_ram(self, data: list[uint32]):
         """Write data to RAM.
 
         The profile to write to and the step, start, and end address
@@ -377,13 +377,13 @@ class AD9910(Generic[SyncDataT]):
         self.bus.set_config_mu(SPI_CONFIG, 32,
                                SPIT_DDS_WR, self.chip_select)
         for i in range(len(data) - 1):
-            self.bus.write(data[i])
+            self.bus.write(int32(data[i]))
         self.bus.set_config_mu(SPI_CONFIG | SPI_END, 32,
                                SPIT_DDS_WR, self.chip_select)
-        self.bus.write(data[len(data) - 1])
+        self.bus.write(int32(data[len(data) - 1]))
 
     @kernel
-    def read_ram(self, data: list[int32]):
+    def read_ram(self, data: list[uint32]):
         """Read data from RAM.
 
         The profile to read from and the step, start, and end address
@@ -404,13 +404,13 @@ class AD9910(Generic[SyncDataT]):
         for i in range(n):
             self.bus.write(0)
             if i >= preload:
-                data[i - preload] = self.bus.read()
+                data[i - preload] = uint32(self.bus.read())
         self.bus.set_config_mu(
             SPI_CONFIG | SPI_INPUT | SPI_END, 32,
             SPIT_DDS_RD, self.chip_select)
         self.bus.write(0)
         for i in range(preload + 1):
-            data[(n - preload) + i] = self.bus.read()
+            data[(n - preload) + i] = uint32(self.bus.read())
 
     @kernel
     def set_cfr1(self,
@@ -575,11 +575,12 @@ class AD9910(Generic[SyncDataT]):
         self.io_update.pulse(1. * us)
 
     @kernel
-    def set_mu(self, ftw: int32 = 0, pow_: int32 = 0, asf: int32 = 0x3fff,
+    def set_mu(self, ftw: uint32 = uint32(0), pow_: uint32 = uint32(0),
+               asf: uint32 = uint32(0x3fff),
                phase_mode: int32 = _PHASE_MODE_DEFAULT,
                ref_time_mu: int64 = int64(-1),
                profile: int32 = DEFAULT_PROFILE,
-               ram_destination: int32 = -1) -> int32:
+               ram_destination: int32 = -1) -> uint32:
         """Set DDS data in machine units.
 
         This uses machine units (FTW, POW, ASF). The frequency tuning word
@@ -635,10 +636,10 @@ class AD9910(Generic[SyncDataT]):
                 # Also no need to use IO_UPDATE time as this
                 # is equivalent to an output pipeline latency.
                 dt = int32(now_mu()) - int32(ref_time_mu)
-                pow_ += dt * ftw * self.sysclk_per_mu >> 16
+                pow_ += uint32(dt * int32(ftw) * self.sysclk_per_mu >> 16)
         if ram_destination == -1:
             self.write64(_AD9910_REG_PROFILE0 + profile,
-                         (asf << 16) | (pow_ & 0xffff), ftw)
+                         int32((asf << 16) | (pow_ & uint32(0xffff))), int32(ftw))
         else:
             if not ram_destination == RAM_DEST_FTW:
                 self.set_ftw(ftw)
@@ -657,7 +658,7 @@ class AD9910(Generic[SyncDataT]):
 
     @kernel
     def get_mu(self, profile: int32 = DEFAULT_PROFILE
-               ) -> tuple[int32, int32, int32]:
+               ) -> tuple[uint32, uint32, uint32]:
         """Get the frequency tuning word, phase offset word,
         and amplitude scale factor.
 
@@ -670,9 +671,9 @@ class AD9910(Generic[SyncDataT]):
         # Read data
         data = int64(self.read64(_AD9910_REG_PROFILE0 + profile))
         # Extract and return fields
-        ftw = int32(data)
-        pow_ = int32(data >> 32) & 0xffff
-        asf = int32(data >> 48) & 0x3fff
+        ftw = uint32(data)
+        pow_ = uint32(data >> 32) & uint32(0xffff)
+        asf = uint32(data >> 48) & uint32(0x3fff)
         return ftw, pow_, asf
 
     @kernel
@@ -703,102 +704,102 @@ class AD9910(Generic[SyncDataT]):
         self.write64(_AD9910_REG_PROFILE0 + profile, hi, lo)
 
     @kernel
-    def set_ftw(self, ftw: int32):
+    def set_ftw(self, ftw: uint32):
         """Set the value stored to the AD9910's frequency tuning word (FTW)
         register.
 
         :param ftw: Frequency tuning word to be stored, range: 0 to 0xffffffff.
         """
-        self.write32(_AD9910_REG_FTW, ftw)
+        self.write32(_AD9910_REG_FTW, int32(ftw))
 
     @kernel
-    def set_asf(self, asf: int32):
+    def set_asf(self, asf: uint32):
         """Set the value stored to the AD9910's amplitude scale factor (ASF)
         register.
 
         :param asf: Amplitude scale factor to be stored, range: 0 to 0x3fff.
         """
-        self.write32(_AD9910_REG_ASF, asf << 2)
+        self.write32(_AD9910_REG_ASF, int32(asf << 2))
 
     @kernel
-    def set_pow(self, pow_: int32):
+    def set_pow(self, pow_: uint32):
         """Set the value stored to the AD9910's phase offset word (POW)
         register.
 
         :param pow_: Phase offset word to be stored, range: 0 to 0xffff.
         """
-        self.write16(_AD9910_REG_POW, pow_)
+        self.write16(_AD9910_REG_POW, int32(pow_))
 
     @kernel
-    def get_ftw(self) -> int32:
+    def get_ftw(self) -> uint32:
         """Get the value stored to the AD9910's frequency tuning word (FTW)
         register.
 
         :return: Frequency tuning word
         """
-        return self.read32(_AD9910_REG_FTW)
+        return uint32(self.read32(_AD9910_REG_FTW))
 
     @kernel
-    def get_asf(self) -> int32:
+    def get_asf(self) -> uint32:
         """Get the value stored to the AD9910's amplitude scale factor (ASF)
         register.
 
         :return: Amplitude scale factor
         """
-        return self.read32(_AD9910_REG_ASF) >> 2
+        return uint32(self.read32(_AD9910_REG_ASF) >> 2)
 
     @kernel
-    def get_pow(self) -> int32:
+    def get_pow(self) -> uint32:
         """Get the value stored to the AD9910's phase offset word (POW)
         register.
 
         :return: Phase offset word
         """
-        return self.read16(_AD9910_REG_POW)
+        return uint32(self.read16(_AD9910_REG_POW))
 
     @portable
-    def frequency_to_ftw(self, frequency: float) -> int32:
+    def frequency_to_ftw(self, frequency: float) -> uint32:
         """Return the 32-bit frequency tuning word corresponding to the given
         frequency.
         """
-        return int32(round(self.ftw_per_hz * frequency))
+        return uint32(round(self.ftw_per_hz * frequency))
 
     @portable
-    def ftw_to_frequency(self, ftw: int32) -> float:
+    def ftw_to_frequency(self, ftw: uint32) -> float:
         """Return the frequency corresponding to the given frequency tuning
         word.
         """
         return float(ftw) / self.ftw_per_hz
 
     @portable
-    def turns_to_pow(self, turns: float) -> int32:
+    def turns_to_pow(self, turns: float) -> uint32:
         """Return the 16-bit phase offset word corresponding to the given phase
         in turns."""
-        return round(turns * float(0x10000)) & 0xffff
+        return uint32(round(turns * float(0x10000)) & 0xffff)
 
     @portable
-    def pow_to_turns(self, pow_: int32) -> float:
+    def pow_to_turns(self, pow_: uint32) -> float:
         """Return the phase in turns corresponding to a given phase offset
         word."""
-        return pow_ / 0x10000
+        return float(pow_) / float(0x10000)
 
     @portable
-    def amplitude_to_asf(self, amplitude: float) -> int32:
+    def amplitude_to_asf(self, amplitude: float) -> uint32:
         """Return 14-bit amplitude scale factor corresponding to given
         fractional amplitude."""
         code = round(amplitude * float(0x3fff))
         if code < 0 or code > 0x3fff:
             raise ValueError("Invalid AD9910 fractional amplitude!")
-        return code
+        return uint32(code)
 
     @portable
-    def asf_to_amplitude(self, asf: int32) -> float:
+    def asf_to_amplitude(self, asf: uint32) -> float:
         """Return amplitude as a fraction of full scale corresponding to given
         amplitude scale factor."""
         return float(asf) / float(0x3fff)
 
     @portable
-    def frequency_to_ram(self, frequency: list[float], ram: list[int32]):
+    def frequency_to_ram(self, frequency: list[float], ram: list[uint32]):
         """Convert frequency values to RAM profile data.
 
         To be used with :const:`RAM_DEST_FTW`.
@@ -811,7 +812,7 @@ class AD9910(Generic[SyncDataT]):
             ram[i] = self.frequency_to_ftw(frequency[i])
 
     @portable
-    def turns_to_ram(self, turns: list[float], ram: list[int32]):
+    def turns_to_ram(self, turns: list[float], ram: list[uint32]):
         """Convert phase values to RAM profile data.
 
         To be used with :const:`RAM_DEST_POW`.
@@ -824,7 +825,7 @@ class AD9910(Generic[SyncDataT]):
             ram[i] = self.turns_to_pow(turns[i]) << 16
 
     @portable
-    def amplitude_to_ram(self, amplitude: list[float], ram: list[int32]):
+    def amplitude_to_ram(self, amplitude: list[float], ram: list[uint32]):
         """Convert amplitude values to RAM profile data.
 
         To be used with :const:`RAM_DEST_ASF`.
@@ -838,7 +839,7 @@ class AD9910(Generic[SyncDataT]):
 
     @portable
     def turns_amplitude_to_ram(self, turns: list[float],
-                               amplitude: list[float], ram: list[int32]):
+                               amplitude: list[float], ram: list[uint32]):
         """Convert phase and amplitude values to RAM profile data.
 
         To be used with :const:`RAM_DEST_POWASF`.
@@ -850,7 +851,7 @@ class AD9910(Generic[SyncDataT]):
         """
         for i in range(len(ram)):
             ram[i] = ((self.turns_to_pow(turns[i]) << 16) |
-                      self.amplitude_to_asf(amplitude[i]) << 2)
+                      (self.amplitude_to_asf(amplitude[i]) << 2))
 
     @kernel
     def set_frequency(self, frequency: float):

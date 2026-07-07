@@ -1,4 +1,4 @@
-from numpy import int32, int64
+from numpy import int32, int64, uint32
 from typing import Generic
 
 from artiq.coredevice.ad9910 import (
@@ -50,7 +50,15 @@ class AD9910Exp(EnvExperiment, Generic[SyncDataT]):
         self.set_dataset(name, data)
 
     @rpc
+    def report_uint32(self, name: str, data: uint32):
+        self.set_dataset(name, data)
+
+    @rpc
     def report_list_int32(self, name: str, data: list[int32]):
+        self.set_dataset(name, data)
+
+    @rpc
+    def report_list_uint32(self, name: str, data: list[uint32]):
         self.set_dataset(name, data)
 
     @rpc
@@ -123,12 +131,12 @@ class AD9910Exp(EnvExperiment, Generic[SyncDataT]):
         self.core.break_realtime()
         att_mu = self.dev.get_att_mu()
 
-        self.report_int32("ftw_set", self.dev.frequency_to_ftw(f))
-        self.report_int32("ftw_get", ftw)
-        self.report_int32("pow_set", self.dev.turns_to_pow(p))
-        self.report_int32("pow_get", pow_)
-        self.report_int32("asf_set", self.dev.amplitude_to_asf(a))
-        self.report_int32("asf_get", asf)
+        self.report_uint32("ftw_set", self.dev.frequency_to_ftw(f))
+        self.report_uint32("ftw_get", ftw)
+        self.report_uint32("pow_set", self.dev.turns_to_pow(p))
+        self.report_uint32("pow_get", pow_)
+        self.report_uint32("asf_set", self.dev.amplitude_to_asf(a))
+        self.report_uint32("asf_get", asf)
         self.report_int32("att_set", self.cpld.att_to_mu(att))
         self.report_int32("att_get", att_mu)
 
@@ -160,12 +168,12 @@ class AD9910Exp(EnvExperiment, Generic[SyncDataT]):
         self.core.break_realtime()
         asf = self.dev.get_asf()
 
-        self.report_int32("ftw_set", self.dev.frequency_to_ftw(f))
-        self.report_int32("ftw_get", ftw)
-        self.report_int32("pow_set", self.dev.turns_to_pow(p))
-        self.report_int32("pow_get", pow_)
-        self.report_int32("asf_set", self.dev.amplitude_to_asf(a))
-        self.report_int32("asf_get", asf)
+        self.report_uint32("ftw_set", self.dev.frequency_to_ftw(f))
+        self.report_uint32("ftw_get", ftw)
+        self.report_uint32("pow_set", self.dev.turns_to_pow(p))
+        self.report_uint32("pow_get", pow_)
+        self.report_uint32("asf_set", self.dev.amplitude_to_asf(a))
+        self.report_uint32("asf_get", asf)
 
         if not self.io_update_device:
             self.core.break_realtime()
@@ -215,7 +223,7 @@ class AD9910Exp(EnvExperiment, Generic[SyncDataT]):
         n = 10
         t0 = self.core.get_rtio_counter_mu()
         for i in range(n):
-            self.dev.set_mu(0x12345678, 0x1234, 0x4321)
+            self.dev.set_mu(uint32(0x12345678), uint32(0x1234), uint32(0x4321))
         self.report_float(
             "dt",
             self.core.mu_to_seconds(self.core.get_rtio_counter_mu() - t0) / float(n),
@@ -318,7 +326,7 @@ class AD9910Exp(EnvExperiment, Generic[SyncDataT]):
             self.dev.cfg_mask_nu(True)
         self.dev.init()
         for i in range(8):
-            self.dev.set_mu(ftw=i, profile=i)
+            self.dev.set_mu(ftw=uint32(i), profile=i)
         ftw = [0] * 8
         for i in range(8):
             self.cpld.set_profile(self.dev.chip_select - 4, i)
@@ -336,10 +344,10 @@ class AD9910Exp(EnvExperiment, Generic[SyncDataT]):
     @kernel
     def ram_write(self):
         n = 1 << 10
-        write = [0] * n
+        write = [uint32(0)] * n
         for i in range(n):
-            write[i] = i | (i << 16)
-        read = [0] * n
+            write[i] = uint32(i | (i << 16))
+        read = [uint32(0)] * n
 
         self.core.break_realtime()
         self.cpld.init()
@@ -358,8 +366,8 @@ class AD9910Exp(EnvExperiment, Generic[SyncDataT]):
         self.dev.write_ram(write)
         self.core.delay(1.0 * ms)
         self.dev.read_ram(read)
-        self.report_list_int32("w", write)
-        self.report_list_int32("r", read)
+        self.report_list_uint32("w", write)
+        self.report_list_uint32("r", read)
         if not self.io_update_device:
             self.core.break_realtime()
             # Unset MASK_NU to un-trigger CFG.IO_UPDATE
@@ -367,10 +375,10 @@ class AD9910Exp(EnvExperiment, Generic[SyncDataT]):
 
     @kernel
     def ram_read_overlapping(self):
-        write = [0] * 989
+        write = [uint32(0)] * 989
         for i in range(len(write)):
-            write[i] = i
-        read = [0] * 100
+            write[i] = uint32(i)
+        read = [uint32(0)] * 100
         offset = 367
 
         self.core.break_realtime()
@@ -406,8 +414,8 @@ class AD9910Exp(EnvExperiment, Generic[SyncDataT]):
         # to the last address of the RAM
         start = len(write) - offset - len(read)
         end = len(write) - offset
-        self.report_list_int32("w", write[start:end])
-        self.report_list_int32("r", read)
+        self.report_list_uint32("w", write[start:end])
+        self.report_list_uint32("r", read)
 
         if not self.io_update_device:
             self.core.break_realtime()
@@ -416,8 +424,8 @@ class AD9910Exp(EnvExperiment, Generic[SyncDataT]):
 
     @kernel
     def ram_exec(self):
-        ftw0 = [0x12345678] * 2
-        ftw1 = [0x55AAAA55] * 2
+        ftw0 = [uint32(0x12345678)] * 2
+        ftw1 = [uint32(0x55AAAA55)] * 2
         self.core.break_realtime()
         self.cpld.init()
         if not self.io_update_device:
@@ -454,7 +462,7 @@ class AD9910Exp(EnvExperiment, Generic[SyncDataT]):
         self.dev.io_update.pulse_mu(int64(8))
         ftw1r = self.dev.read32(_AD9910_REG_FTW)
 
-        self.report_list_int32("ftw", [ftw0[0], ftw0r, ftw1[0], ftw1r])
+        self.report_list_uint32("ftw", [ftw0[0], uint32(ftw0r), ftw1[0], uint32(ftw1r)])
 
         if not self.io_update_device:
             self.core.break_realtime()
@@ -464,7 +472,7 @@ class AD9910Exp(EnvExperiment, Generic[SyncDataT]):
     @kernel
     def ram_convert_frequency(self):
         freq = [33.0 * MHz] * 2
-        ram = [0] * len(freq)
+        ram = [uint32(0)] * len(freq)
         self.dev.frequency_to_ram(freq, ram)
 
         self.core.break_realtime()
@@ -484,7 +492,7 @@ class AD9910Exp(EnvExperiment, Generic[SyncDataT]):
         self.dev.set_cfr1(ram_enable=1, ram_destination=RAM_DEST_FTW)
         self.dev.io_update.pulse_mu(int64(8))
         ftw_read = self.dev.read32(_AD9910_REG_FTW)
-        self.report_list_int32("ram", ram)
+        self.report_list_uint32("ram", ram)
         self.report_int32("ftw_read", ftw_read)
         self.report_list_float("freq", freq)
         if not self.io_update_device:
@@ -496,11 +504,11 @@ class AD9910Exp(EnvExperiment, Generic[SyncDataT]):
     def ram_convert_powasf(self):
         amplitude = [0.1, 0.9]
         turns = [0.3, 0.5]
-        ram = [0] * 2
+        ram = [uint32(0)] * 2
         self.dev.turns_amplitude_to_ram(turns, amplitude, ram)
         self.report_list_float("amplitude", amplitude)
         self.report_list_float("turns", turns)
-        self.report_list_int32("ram", ram)
+        self.report_list_uint32("ram", ram)
 
 
 class AD9910Test(ExperimentCase):
