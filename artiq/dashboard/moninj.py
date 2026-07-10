@@ -524,6 +524,9 @@ class _DeviceManager:
 
         # initialize CPLD (if applicable)
         if dds_model.is_urukul:
+            # generate type annotation for the Urukul CPLD
+            cpld_annotation = "{}: KernelInvariant[UrukulCPLD[Auto]]".format(dds_model.cpld)
+
             # urukuls need CPLD init and switch to on
             cpld_dev = """self.setattr_device("core_cache")
                 self.setattr_device("{}")""".format(dds_model.cpld)
@@ -532,12 +535,12 @@ class _DeviceManager:
             # so {action} can use it
             # if there's no RF enabled, CPLD may have not been initialized
             # but if there is, it has been initialised - no need to do again
-            cpld_init = """delay(15*ms)
+            cpld_init = """self.core.delay(15.*ms)
                 was_init = self.core_cache.get("_{cpld}_init")
                 sta = self.{cpld}.sta_read()
                 rf_sw = urukul_sta_rf_sw(sta)
                 if rf_sw == 0 and len(was_init) == 0:
-                    delay(15*ms)
+                    self.core.delay(15.*ms)
                     self.{cpld}.init()
                     self.core_cache.put("_{cpld}_init", [1])
             """.format(cpld=dds_model.cpld)
@@ -547,17 +550,23 @@ class _DeviceManager:
 
         # AD9912/9910: init channel (if uninitialized)
         if dds_model.dds_type == "AD9912":
+            # generate import and type annotation for AD9912
+            dds_import = "from artiq.coredevice.ad9912 import AD9912"
+            dds_annotation = "{}: KernelInvariant[AD9912]".format(dds_channel)
             # 0xFF before init, 0x99 after
             channel_init = """
                 if self.{dds_channel}.read({cfgreg}, length=1) == 0xFF:
-                    delay(10*ms)
+                    self.core.delay(10.*ms)
                     self.{dds_channel}.init()
             """.format(dds_channel=dds_channel, cfgreg=AD9912_SER_CONF)
         elif dds_model.dds_type == "AD9910":
+            # generate import and type annotation for AD9910
+            dds_import = "from artiq.coredevice.ad9910 import AD9910"
+            dds_annotation = "{}: KernelInvariant[AD9910[Auto]]".format(dds_channel)
             # -1 before init, 2 after
             channel_init = """
                 if self.{dds_channel}.read32({cfgreg}) == -1:
-                    delay(10*ms)
+                    self.core.delay(10.*ms)
                     self.{dds_channel}.init()
             """.format(dds_channel=dds_channel, cfgreg=AD9912_SER_CONF)
         else:
@@ -566,8 +575,18 @@ class _DeviceManager:
         dds_exp = textwrap.dedent("""
         from artiq.experiment import *
         from artiq.coredevice.urukul import *
+        from artiq.coredevice.urukul import CPLD as UrukulCPLD
+        from artiq.coredevice.core import Core
+        from artiq.coredevice.cache import CoreCache
+        {dds_import}
 
+        @compile
         class {title}(EnvExperiment):
+            core: KernelInvariant[Core]
+            core_cache: KernelInvariant[CoreCache]
+            {cpld_annotation}
+            {dds_annotation}
+
             def build(self):
                 self.setattr_device("core")
                 self.setattr_device("{dds_channel}")
@@ -577,14 +596,17 @@ class _DeviceManager:
             def run(self):
                 self.core.break_realtime()
                 {cpld_init}
-                delay(10*ms)
+                self.core.delay(10.*ms)
                 {channel_init}
-                delay(15*ms)
+                self.core.delay(15.*ms)
                 {action}
         """.format(title=title, action=action,
                    dds_channel=dds_channel,
                    cpld_dev=cpld_dev, cpld_init=cpld_init,
-                   channel_init=channel_init))
+                   channel_init=channel_init,
+                   dds_import=dds_import,
+                   cpld_annotation=cpld_annotation,
+                   dds_annotation=dds_annotation))
         asyncio.ensure_future(
             self._submit_by_content(
                 dds_exp,
