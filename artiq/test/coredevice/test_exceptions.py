@@ -97,13 +97,17 @@ class TracebackTest(ExperimentCase):
                     yield inlined_filename, inlined_line
                 yield filename, line
 
+        source_lines = ""
+        expected_line = "self.core_dma.playback(self.trace_name)"
         for filename, line in get_backtrace_records():
             source_line = linecache.getline(filename, line)
-            if source_line:
-                self.assertEqual(
-                    source_line.strip(),
-                    "self.core_dma.playback(self.trace_name)",
-                    "traceback found an incorrect source of exception")
-                return
-
-        self.fail("traceback failed to find the source of exception")
+            source_lines += source_line
+            if source_line.strip() == expected_line:
+                break
+        else:
+            if source_lines:
+                self.fail("traceback found an incorrect source of exception:\n"
+                    f"expected:\n\t{expected_line}\n"
+                    f"found:\n{source_lines}")
+            else:
+                self.fail("traceback failed to find the source of exception")
