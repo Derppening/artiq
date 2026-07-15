@@ -80,6 +80,12 @@ def _receive_list(kernel, embedding_map):
     elif tag == "I":
         buffer = kernel._read(8 * length)
         return list(numpy.ndarray((length, ), kernel.endian + 'i8', buffer))
+    elif tag == "u":
+        buffer = kernel._read(4 * length)
+        return list(struct.unpack(kernel.endian + "%sL" % length, buffer))
+    elif tag == "U":
+        buffer = kernel._read(8 * length)
+        return list(numpy.ndarray((length, ), kernel.endian + 'u8', buffer))
     elif tag == "f":
         buffer = kernel._read(8 * length)
         return list(struct.unpack(kernel.endian + "%sd" % length, buffer))
@@ -110,6 +116,12 @@ def _receive_array(kernel, embedding_map):
     elif tag == "I":
         buffer = kernel._read(8 * length)
         elems = numpy.ndarray((length, ), kernel.endian + 'i8', buffer)
+    elif tag == "u":
+        buffer = kernel._read(4 * length)
+        elems = numpy.ndarray((length, ), kernel.endian + 'u4', buffer)
+    elif tag == "U":
+        buffer = kernel._read(8 * length)
+        elems = numpy.ndarray((length, ), kernel.endian + 'u8', buffer)
     elif tag == "f":
         buffer = kernel._read(8 * length)
         elems = numpy.ndarray((length, ), kernel.endian + 'd', buffer)
@@ -147,6 +159,8 @@ receivers = {
     "b": lambda kernel, embedding_map: bool(kernel._read_int8()),
     "i": lambda kernel, embedding_map: numpy.int32(kernel._read_int32()),
     "I": lambda kernel, embedding_map: numpy.int64(kernel._read_int64()),
+    "u": lambda kernel, embedding_map: numpy.uint32(kernel._read_uint32()),
+    "U": lambda kernel, embedding_map: numpy.uint64(kernel._read_uint64()),
     "f": lambda kernel, embedding_map: kernel._read_float64(),
     "s": lambda kernel, embedding_map: kernel._read_string(),
     "B": lambda kernel, embedding_map: kernel._read_bytes(),
@@ -322,12 +336,16 @@ class CommKernel:
             raise IOError("Incorrect reply from device: expected e/E.")
         self.unpack_int32 = struct.Struct(self.endian + "l").unpack
         self.unpack_int64 = struct.Struct(self.endian + "q").unpack
+        self.unpack_uint32 = struct.Struct(self.endian + "L").unpack
+        self.unpack_uint64 = struct.Struct(self.endian + "Q").unpack
         self.unpack_float64 = struct.Struct(self.endian + "d").unpack
 
         self.pack_header = struct.Struct(self.endian + "lB").pack
         self.pack_int8 = struct.Struct(self.endian + "B").pack
         self.pack_int32 = struct.Struct(self.endian + "l").pack
         self.pack_int64 = struct.Struct(self.endian + "q").pack
+        self.pack_uint32 = struct.Struct(self.endian + "L").pack
+        self.pack_uint64 = struct.Struct(self.endian + "Q").pack
         self.pack_float64 = struct.Struct(self.endian + "d").pack
 
     def close(self):
@@ -397,6 +415,14 @@ class CommKernel:
         (value, ) = self.unpack_int64(self._read(8))
         return value
 
+    def _read_uint32(self):
+        (value, ) = self.unpack_uint32(self._read(4))
+        return value
+
+    def _read_uint64(self):
+        (value, ) = self.unpack_uint64(self._read(8))
+        return value
+
     def _read_float64(self):
         (value, ) = self.unpack_float64(self._read(8))
         return value
@@ -447,6 +473,12 @@ class CommKernel:
 
     def _write_int64(self, value):
         self._write(self.pack_int64(value))
+
+    def _write_uint32(self, value):
+        self._write(self.pack_uint32(value))
+
+    def _write_uint64(self, value):
+        self._write(self.pack_uint64(value))
 
     def _write_float64(self, value):
         self._write(self.pack_float64(value))
@@ -588,6 +620,16 @@ class CommKernel:
                   (-2**63 <= value <= 2**63-1),
                   lambda: "64-bit int")
             self._write_int64(value)
+        elif tag == "u":
+            check(isinstance(value, (int, numpy.uint32)) and
+                  (0 <= value <= 2**32-1),
+                  lambda: "32-bit unsigned int")
+            self._write_uint32(value)
+        elif tag == "U":
+            check(isinstance(value, (int, numpy.uint32, numpy.uint64)) and
+                  (0 <= value <= 2**64-1),
+                  lambda: "64-bit unsigned int")
+            self._write_uint64(value)
         elif tag == "f":
             check(isinstance(value, float),
                   lambda: "float")
@@ -632,6 +674,20 @@ class CommKernel:
                     raise RPCReturnValueError(
                         "type mismatch: cannot serialize {value} as {type}".format(
                             value=repr(value), type="64-bit integer list"))
+            elif tag_element == "u":
+                try:
+                    self._write(struct.pack(self.endian + "%sL" % len(value), *value))
+                except struct.error:
+                    raise RPCReturnValueError(
+                        "type mismatch: cannot serialize {value} as {type}".format(
+                            value=repr(value), type="32-bit unsigned integer list"))
+            elif tag_element == "U":
+                try:
+                    self._write(struct.pack(self.endian + "%sQ" % len(value), *value))
+                except struct.error:
+                    raise RPCReturnValueError(
+                        "type mismatch: cannot serialize {value} as {type}".format(
+                            value=repr(value), type="64-bit unsigned integer list"))
             elif tag_element == "f":
                 self._write(struct.pack(self.endian + "%sd" %
                                         len(value), *value))
@@ -658,6 +714,14 @@ class CommKernel:
             elif tag_element == "I":
                 array = value.reshape(
                     (-1,), order="C").astype(self.endian + 'i8')
+                self._write(array.tobytes())
+            elif tag_element == "u":
+                array = value.reshape(
+                    (-1,), order="C").astype(self.endian + 'u4')
+                self._write(array.tobytes())
+            elif tag_element == "U":
+                array = value.reshape(
+                    (-1,), order="C").astype(self.endian + 'u8')
                 self._write(array.tobytes())
             elif tag_element == "f":
                 array = value.reshape(

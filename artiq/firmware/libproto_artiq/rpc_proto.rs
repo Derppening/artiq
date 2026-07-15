@@ -54,13 +54,13 @@ where
             let dest = slice::from_raw_parts_mut(storage as *mut u8, length);
             reader.read_exact(dest)?;
         },
-        Tag::Int32 => {
+        Tag::Int32 | Tag::UInt32 => {
             let dest = slice::from_raw_parts_mut(storage as *mut u8, length * 4);
             reader.read_exact(dest)?;
             let dest = slice::from_raw_parts_mut(storage as *mut i32, length);
             NativeEndian::from_slice_i32(dest);
         },
-        Tag::Int64 | Tag::Float64 => {
+        Tag::Int64 | Tag::UInt64 | Tag::Float64 => {
             let dest = slice::from_raw_parts_mut(storage as *mut u8, length * 8);
             reader.read_exact(dest)?;
             let dest = slice::from_raw_parts_mut(storage as *mut i64, length);
@@ -101,11 +101,11 @@ unsafe fn recv_value<R, E>(reader: &mut R, tag: Tag, data: &mut *mut (),
             consume_value!(u8, |ptr| {
                 *ptr = reader.read_u8()?; Ok(())
             }),
-        Tag::Int32 =>
+        Tag::Int32 | Tag::UInt32 =>
             consume_value!(u32, |ptr| {
                 *ptr = reader.read_u32()?; Ok(())
             }),
-        Tag::Int64 | Tag::Float64 =>
+        Tag::Int64 | Tag::UInt64 | Tag::Float64 =>
             consume_value!(u64, |ptr| {
                 *ptr = reader.read_u64()?; Ok(())
             }),
@@ -221,11 +221,11 @@ unsafe fn send_elements<W>(writer: &mut W, elt_tag: Tag, length: usize, data: *c
             let slice = slice::from_raw_parts(data as *const u8, length);
             writer.write_all(slice)?;
         },
-        Tag::Int32 => {
+        Tag::Int32 | Tag::UInt32 => {
             let slice = slice::from_raw_parts(data as *const u8, length * 4);
             writer.write_all(slice)?;
         },
-        Tag::Int64 | Tag::Float64 => {
+        Tag::Int64 | Tag::UInt64 | Tag::Float64 => {
             let slice = slice::from_raw_parts(data as *const u8, length * 8);
             writer.write_all(slice)?;
         },
@@ -258,10 +258,10 @@ unsafe fn send_value<W>(writer: &mut W, tag: Tag, data: &mut *const (), write_ta
         Tag::Bool =>
             consume_value!(u8, |ptr|
                 writer.write_u8(*ptr)),
-        Tag::Int32 =>
+        Tag::Int32 | Tag::UInt32 =>
             consume_value!(u32, |ptr|
                 writer.write_u32(*ptr)),
-        Tag::Int64 | Tag::Float64 =>
+        Tag::Int64 | Tag::UInt64 | Tag::Float64 =>
             consume_value!(u64, |ptr|
                 writer.write_u64(*ptr)),
         Tag::String =>
@@ -388,6 +388,8 @@ mod tag {
         Bool,
         Int32,
         Int64,
+        UInt32,
+        UInt64,
         Float64,
         String,
         Bytes,
@@ -407,6 +409,8 @@ mod tag {
                 Tag::Bool => b'b',
                 Tag::Int32 => b'i',
                 Tag::Int64 => b'I',
+                Tag::UInt32 => b'u',
+                Tag::UInt64 => b'U',
                 Tag::Float64 => b'f',
                 Tag::String => b's',
                 Tag::Bytes => b'B',
@@ -427,6 +431,8 @@ mod tag {
                 Tag::Bool => core::mem::align_of::<u8>(),
                 Tag::Int32 => core::mem::align_of::<i32>(),
                 Tag::Int64 => core::mem::align_of::<i64>(),
+                Tag::UInt32 => core::mem::align_of::<u32>(),
+                Tag::UInt64 => core::mem::align_of::<u64>(),
                 Tag::Float64 => core::mem::align_of::<f64>(),
                 // struct type: align to largest element
                 Tag::Tuple(it, arity) => {
@@ -455,6 +461,8 @@ mod tag {
                 Tag::Bool => 1,
                 Tag::Int32 => 4,
                 Tag::Int64 => 8,
+                Tag::UInt32 => 4,
+                Tag::UInt64 => 8,
                 Tag::Float64 => 8,
                 Tag::String => 8,
                 Tag::Bytes => 8,
@@ -509,6 +517,8 @@ mod tag {
                 b'b' => Tag::Bool,
                 b'i' => Tag::Int32,
                 b'I' => Tag::Int64,
+                b'u' => Tag::UInt32,
+                b'U' => Tag::UInt64,
                 b'f' => Tag::Float64,
                 b's' => Tag::String,
                 b'B' => Tag::Bytes,
@@ -567,6 +577,10 @@ mod tag {
                         write!(f, "Int32")?,
                     Tag::Int64 =>
                         write!(f, "Int64")?,
+                    Tag::UInt32 =>
+                        write!(f, "UInt32")?,
+                    Tag::UInt64 =>
+                        write!(f, "UInt64")?,
                     Tag::Float64 =>
                         write!(f, "Float64")?,
                     Tag::String =>
