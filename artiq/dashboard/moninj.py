@@ -325,30 +325,114 @@ class _DDSWidget(_MoninjWidget):
 
 
 class _DACWidget(_MoninjWidget):
-    def __init__(self, dm, spi_channel, channel, title, vref, offset_dacs):
+    def __init__(self, dm, spi_channel, channel, title, dac_type, vref, offset_dacs):
         _MoninjWidget.__init__(self, "{}_ch{}".format(title, channel))
+        self.dm = dm
         self.spi_channel = spi_channel
         self.channel = channel
         self.cur_value = 0x8000
         self.title = title
+        self.dac_type = dac_type
         self.vref = vref
         self.offset_dacs = offset_dacs
 
-        self.value = QtWidgets.QLabel()
-        self.value.setAlignment(QtCore.Qt.AlignmentFlag.AlignHCenter | QtCore.Qt.AlignmentFlag.AlignTop)
-        self.grid.addWidget(self.value, 2, 1, 6, 1)
+        # FREQ DATA/EDIT FIELD
+        self.data_stack = QtWidgets.QStackedWidget()
+
+        # page 1: display data
+        grid_disp = LayoutWidget()
+        grid_disp.layout.setContentsMargins(0, 0, 0, 0)
+        grid_disp.layout.setHorizontalSpacing(0)
+        grid_disp.layout.setVerticalSpacing(0)
+
+        self.value_label = QtWidgets.QLabel()
+        self.value_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        grid_disp.addWidget(self.value_label, 0, 1, 1, 2)
+
+        unit = QtWidgets.QLabel("V")
+        unit.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        grid_disp.addWidget(unit, 0, 3, 1, 1)
+
+        self.data_stack.addWidget(grid_disp)
+
+        # page 2: edit data
+        grid_edit = LayoutWidget()
+        grid_edit.layout.setContentsMargins(0, 0, 0, 0)
+        grid_edit.layout.setHorizontalSpacing(0)
+        grid_edit.layout.setVerticalSpacing(0)
+
+        self.value_edit = _CancellableLineEdit(self)
+        self.value_edit.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
+        grid_edit.addWidget(self.value_edit, 0, 1, 1, 2)
+        unit = QtWidgets.QLabel("V")
+        unit.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        grid_edit.addWidget(unit, 0, 3, 1, 1)
+        self.data_stack.addWidget(grid_edit)
+
+        self.grid.addWidget(self.data_stack, 2, 1)
+
+        # BUTTONS
+        self.button_stack = QtWidgets.QStackedWidget()
+
+        # page 1: SET button
+        set_grid = LayoutWidget()
+
+        set_btn = QtWidgets.QToolButton()
+        set_btn.setText("Set")
+        set_btn.setToolTip("Set voltage")
+        set_grid.addWidget(set_btn, 0, 1, 1, 1)
+
+        self.button_stack.addWidget(set_grid)
+
+        # page 2: apply/cancel buttons
+        apply_grid = LayoutWidget()
+        apply = QtWidgets.QToolButton()
+        apply.setText("Apply")
+        apply.setToolTip("Apply changes")
+        apply_grid.addWidget(apply, 0, 1, 1, 1)
+        cancel = QtWidgets.QToolButton()
+        cancel.setText("Cancel")
+        cancel.setToolTip("Cancel changes")
+        apply_grid.addWidget(cancel, 0, 2, 1, 1)
+        self.button_stack.addWidget(apply_grid)
+        self.grid.addWidget(self.button_stack, 3, 1)
 
         self.grid.setRowStretch(1, 1)
         self.grid.setRowStretch(2, 1)
+        self.grid.setRowStretch(3, 1)
+
+        set_btn.clicked.connect(self.set_clicked)
+        apply.clicked.connect(self.apply_changes)
+        cancel.clicked.connect(self.cancel_changes)
+        self.value_edit.returnPressed.connect(lambda: self.apply_changes(None))
+        self.value_edit.escapePressedConnect(self.cancel_changes)
 
         self.refresh_display()
+    
+    def set_clicked(self, set):
+        self.data_stack.setCurrentIndex(1)
+        self.button_stack.setCurrentIndex(1)
+        self.value_edit.setText("{:.3f}".format(self.mu_to_voltage(self.cur_value)))
+        self.value_edit.setFocus()
+        self.value_edit.selectAll()
+
+    def apply_changes(self, apply):
+        self.data_stack.setCurrentIndex(0)
+        self.button_stack.setCurrentIndex(0)
+        voltage = float(self.value_edit.text())
+        self.dm.dac_set_voltage(self.title, self.channel, self.dac_type, voltage)
+
+    def cancel_changes(self, cancel):
+        self.data_stack.setCurrentIndex(0)
+        self.button_stack.setCurrentIndex(0)
 
     def mu_to_voltage(self, code):
         return ((code - self.offset_dacs * 0x4) / (1 << 16)) * (4. * self.vref)
 
     def refresh_display(self):
-        self.value.setText("<font size=\"4\">{:+.3f} V</font>"
+        self.value_label.setText("<font size=\"4\">{:+.3f}</font>"
                            .format(self.mu_to_voltage(self.cur_value)))
+        self.value_edit.setText("{:+.3f}".format(self.mu_to_voltage(self.cur_value)))
 
     def sort_key(self):
         return (2, self.spi_channel, self.channel)
@@ -411,7 +495,7 @@ def setup_from_ddb(ddb):
                         offset_dacs = v["arguments"].get("offset_dacs", 8192)
                         for channel in range(32):
                             widget = _WidgetDesc((k, channel), comment, _DACWidget,
-                                                 (spi_channel, channel, k, vref, offset_dacs))
+                                                 (spi_channel, channel, k, v["class"], vref, offset_dacs))
                             description.add(widget)
                     elif (v["module"] == "artiq.coredevice.fastino" and v["class"] == "Fastino"):
                         bus_channel = v["arguments"]["channel"]
@@ -627,6 +711,49 @@ class _DeviceManager:
             action,
             "SetDDS",
             "Set DDS {} {}MHz".format(dds_channel, freq / 1e6))
+
+    def _dac_faux_injection(self, dac_name, dac_type, action, title, log_msg):
+        dac_exp = textwrap.dedent("""
+        from artiq.experiment import *
+        from artiq.coredevice.core import Core
+        from artiq.coredevice.zotino import Zotino
+        from artiq.coredevice.ad53xx import AD53xx
+
+        @compile
+        class {title}(EnvExperiment):
+            core: KernelInvariant[Core]
+            {dac}: KernelInvariant[{dac_type}]
+            
+            def build(self):
+                self.setattr_device("core")
+                self.setattr_device("{dac}")
+
+            @kernel
+            def run(self):
+                self.core.break_realtime()
+                self.{dac}.init()
+                {action}
+        """.format(title=title,
+                   dac=dac_name,
+                   action=action,
+                   dac_type=dac_type))
+        asyncio.ensure_future(
+            self._submit_by_content(
+                dac_exp,
+                title,
+                log_msg))
+
+    def dac_set_voltage(self, dac_name, dac_channel, dac_type, voltage):
+        action = """
+                self.{dac}.write_dac({ch}, {v})
+                self.{dac}.load()
+        """.format(dac=dac_name, ch=dac_channel, v=voltage)
+        self._dac_faux_injection(
+            dac_name,
+            dac_type,
+            action,
+            "SetDAC",
+            "Set DAC {} channel {} to {}V".format(dac_name, dac_channel, voltage))
 
     def dds_channel_toggle(self, dds_channel, dds_model, sw=True):
         # urukul only

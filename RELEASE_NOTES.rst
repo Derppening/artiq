@@ -17,6 +17,7 @@ ARTIQ-10 (Unreleased)
 * The IPv4 and IPv6 default route configuration entries were renamed
  - `ipv4_default_route` was renamed to `ip_default_route`
  - `ipv6_default_route` was renamed to `ip6_default_route`
+* Setting Zotino voltages in the dashboard moninj panel is now supported.
 
 ARTIQ-9
 -------
