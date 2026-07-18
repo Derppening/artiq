@@ -5,9 +5,8 @@ import logging
 import asyncio
 import struct
 from enum import Enum
-import atexit
 
-from sipyco.tools import AsyncioServer, SignalHandler, atexit_register_coroutine
+from sipyco.tools import AsyncioServer, SignalHandler, ExitStack
 from sipyco.pc_rpc import Server
 from sipyco import common_args
 
@@ -200,42 +199,43 @@ def main():
 
     bind_address = common_args.bind_address_from_args(args)
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    atexit.register(loop.close)
+    with ExitStack() as exit_stack:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        exit_stack.register(loop.close)
 
-    signal_handler = SignalHandler()
-    signal_handler.setup()
-    atexit.register(signal_handler.teardown)
+        signal_handler = SignalHandler()
+        signal_handler.setup()
+        exit_stack.register(signal_handler.teardown)
 
-    server = Server({"moninj_proxy": PingTarget()}, None, True)
-    loop.run_until_complete(server.start(bind_address, args.port_control))
-    atexit_register_coroutine(server.stop, loop=loop)
+        server = Server({"moninj_proxy": PingTarget()}, None, True)
+        loop.run_until_complete(server.start(bind_address, args.port_control))
+        exit_stack.register_coro(server.stop, loop=loop)
 
-    monitor_mux = MonitorMux()
-    comm_moninj = CommMonInj(monitor_mux.monitor_cb,
-                             monitor_mux.injection_status_cb,
-                             monitor_mux.disconnect_cb)
-    monitor_mux.comm_moninj = comm_moninj
+        monitor_mux = MonitorMux()
+        comm_moninj = CommMonInj(monitor_mux.monitor_cb,
+                                monitor_mux.injection_status_cb,
+                                monitor_mux.disconnect_cb)
+        monitor_mux.comm_moninj = comm_moninj
 
-    proxy_server = ProxyServer(monitor_mux)
+        proxy_server = ProxyServer(monitor_mux)
 
-    async def run_moninj_proxy():
-        await comm_moninj.connect(args.core_addr)
-        atexit_register_coroutine(comm_moninj.close, loop=loop)
-        await proxy_server.start(bind_address, args.port_proxy)
-        atexit_register_coroutine(proxy_server.stop, loop=loop)
-        await comm_moninj.wait_terminate()
+        async def run_moninj_proxy():
+            await comm_moninj.connect(args.core_addr)
+            exit_stack.register_coro(comm_moninj.close, loop=loop)
+            await proxy_server.start(bind_address, args.port_proxy)
+            exit_stack.register_coro(proxy_server.stop, loop=loop)
+            await comm_moninj.wait_terminate()
 
-    done, pending = loop.run_until_complete(asyncio.wait(
-        [loop.create_task(run_moninj_proxy()),
-         loop.create_task(signal_handler.wait_terminate()),
-         loop.create_task(server.wait_terminate())],
-        return_when=asyncio.FIRST_COMPLETED))
-    for task in pending:
-        task.cancel()
-    for task in done:
-        task.result()
+        done, pending = loop.run_until_complete(asyncio.wait(
+            [loop.create_task(run_moninj_proxy()),
+            loop.create_task(signal_handler.wait_terminate()),
+            loop.create_task(server.wait_terminate())],
+            return_when=asyncio.FIRST_COMPLETED))
+        for task in pending:
+            task.cancel()
+        for task in done:
+            task.result()
 
 
 if __name__ == "__main__":
