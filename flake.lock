@@ -12,11 +12,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1781159108,
-        "narHash": "sha256-LhlvQ1hSVgOyZvFASpQ7vyA8x4okGV9MFB3cYlgNhIE=",
+        "lastModified": 1784349788,
+        "narHash": "sha256-Osc9p7GzK4bggJuuJpkfkMNry3VMJhnrluvYHmaHXY0=",
         "ref": "refs/heads/master",
-        "rev": "3e81cfb88bbe52ec9921629766586cffc19bfcfa",
-        "revCount": 51,
+        "rev": "cb8b5a05ed0e9fd7304f423602a588f6134dfd13",
+        "revCount": 57,
         "type": "git",
         "url": "https://git.m-labs.hk/M-Labs/artiq-comtools.git"
       },
@@ -177,11 +177,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1776943619,
-        "narHash": "sha256-GGw/wCduc/9OEZ1XYwDH7xOPEjUNVJPhI8yk59SmAGA=",
+        "lastModified": 1784348920,
+        "narHash": "sha256-/XgcTLa3qwSfL29ZJbiI7rih7Yi/bY0w6UGm0DgAraI=",
         "ref": "refs/heads/master",
-        "rev": "08114235deb00b7406ab12224c8144c6c310e98a",
-        "revCount": 158,
+        "rev": "9956a425ab47a8c02b662e38ca7e1e6c9a9ca843",
+        "revCount": 160,
         "type": "git",
         "url": "https://git.m-labs.hk/M-Labs/sipyco.git"
       },
