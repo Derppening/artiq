@@ -2,10 +2,9 @@
 
 import argparse
 import asyncio
-import atexit
 import logging
 
-from sipyco.tools import AsyncioServer, SignalHandler, atexit_register_coroutine
+from sipyco.tools import AsyncioServer, SignalHandler, ExitStack
 from sipyco.pc_rpc import Server
 from sipyco import common_args
 
@@ -79,31 +78,32 @@ def main():
     args = get_argparser().parse_args()
     common_args.init_logger_from_args(args)
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    atexit.register(loop.close)
+    with ExitStack() as exit_stack:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        exit_stack.register(loop.close)
 
-    signal_handler = SignalHandler()
-    signal_handler.setup()
-    atexit.register(signal_handler.teardown)
+        signal_handler = SignalHandler()
+        signal_handler.setup()
+        exit_stack.register(signal_handler.teardown)
 
-    bind_address = common_args.bind_address_from_args(args)
+        bind_address = common_args.bind_address_from_args(args)
 
-    proxy_server = ProxyServer()
-    loop.run_until_complete(proxy_server.start(bind_address, args.port_proxy))
-    atexit_register_coroutine(proxy_server.stop, loop=loop)
+        proxy_server = ProxyServer()
+        loop.run_until_complete(proxy_server.start(bind_address, args.port_proxy))
+        exit_stack.register_coro(proxy_server.stop, loop=loop)
 
-    controller = ProxyControl(proxy_server.distribute, args.core_addr)
-    server = Server({"coreanalyzer_proxy_control": controller}, None, True)
-    loop.run_until_complete(server.start(bind_address, args.port_control))
-    atexit_register_coroutine(server.stop, loop=loop)
+        controller = ProxyControl(proxy_server.distribute, args.core_addr)
+        server = Server({"coreanalyzer_proxy_control": controller}, None, True)
+        loop.run_until_complete(server.start(bind_address, args.port_control))
+        exit_stack.register_coro(server.stop, loop=loop)
 
-    _, pending = loop.run_until_complete(asyncio.wait(
-        [loop.create_task(signal_handler.wait_terminate()),
-         loop.create_task(server.wait_terminate())],
-        return_when=asyncio.FIRST_COMPLETED))
-    for task in pending:
-        task.cancel()
+        _, pending = loop.run_until_complete(asyncio.wait(
+            [loop.create_task(signal_handler.wait_terminate()),
+            loop.create_task(server.wait_terminate())],
+            return_when=asyncio.FIRST_COMPLETED))
+        for task in pending:
+            task.cancel()
 
 
 if __name__ == "__main__":
