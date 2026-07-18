@@ -2,7 +2,6 @@
 
 import argparse
 import asyncio
-import atexit
 import importlib
 import os
 import logging
@@ -13,7 +12,7 @@ from qasync import QEventLoop
 from sipyco.pc_rpc import AsyncioClient, Client
 from sipyco.broadcast import Receiver
 from sipyco import common_args
-from sipyco.tools import atexit_register_coroutine, SimpleSSLConfig
+from sipyco.tools import ExitStack, SimpleSSLConfig
 from sipyco.sync_struct import Subscriber
 
 from artiq import __artiq_dir__ as artiq_dir, __version__ as artiq_version
@@ -147,167 +146,168 @@ def main():
         # force XCB instead of Wayland due to applets not embedding
         forced_platform = ["-platform", "xcb"]
     app = QtWidgets.QApplication(["ARTIQ Dashboard"] + forced_platform)
-    loop = QEventLoop(app)
-    asyncio.set_event_loop(loop)
-    atexit.register(loop.close)
-    smgr = state.StateManager(args.db_file)
+    with ExitStack() as exit_stack:
+        loop = QEventLoop(app)
+        asyncio.set_event_loop(loop)
+        exit_stack.register(loop.close)
+        smgr = state.StateManager(args.db_file)
 
-    # create connections to master
-    rpc_clients = dict()
-    for target in "schedule", "experiment_db", "dataset_db", "device_db", "interactive_arg_db":
-        client = AsyncioClient()
-        loop.run_until_complete(client.connect_rpc(
-            args.server, args.port_control, target, ssl_config=ssl_config))
-        atexit_register_coroutine(client.close_rpc)
-        rpc_clients[target] = client
+        # create connections to master
+        rpc_clients = dict()
+        for target in "schedule", "experiment_db", "dataset_db", "device_db", "interactive_arg_db":
+            client = AsyncioClient()
+            loop.run_until_complete(client.connect_rpc(
+                args.server, args.port_control, target, ssl_config=ssl_config))
+            exit_stack.register_coro(client.close_rpc)
+            rpc_clients[target] = client
 
-    master_management = Client(args.server, args.port_control, "master_management", ssl_config=ssl_config)
-    try:
-        server_name = master_management.get_name()
-    finally:
-        master_management.close_rpc()
+        master_management = Client(args.server, args.port_control, "master_management", ssl_config=ssl_config)
+        try:
+            server_name = master_management.get_name()
+        finally:
+            master_management.close_rpc()
 
-    disconnect_reported = False
+        disconnect_reported = False
 
-    def report_disconnect():
-        nonlocal disconnect_reported
-        if not disconnect_reported:
-            logging.error("connection to master lost, "
-                          "restart dashboard to reconnect")
-        disconnect_reported = True
+        def report_disconnect():
+            nonlocal disconnect_reported
+            if not disconnect_reported:
+                logging.error("connection to master lost, "
+                            "restart dashboard to reconnect")
+            disconnect_reported = True
 
-    sub_clients = dict()
-    for notifier_name, modelf in (("explist", explorer.Model),
-                                  ("explist_status", explorer.StatusUpdater),
-                                  ("datasets", datasets.Model),
-                                  ("schedule", schedule.Model),
-                                  ("interactive_args", interactive_args.Model)):
-        subscriber = ModelSubscriber(notifier_name, modelf, report_disconnect)
-        loop.run_until_complete(subscriber.connect(
-            args.server, args.port_notify, ssl_config=ssl_config))
-        atexit_register_coroutine(subscriber.close, loop=loop)
-        sub_clients[notifier_name] = subscriber
+        sub_clients = dict()
+        for notifier_name, modelf in (("explist", explorer.Model),
+                                    ("explist_status", explorer.StatusUpdater),
+                                    ("datasets", datasets.Model),
+                                    ("schedule", schedule.Model),
+                                    ("interactive_args", interactive_args.Model)):
+            subscriber = ModelSubscriber(notifier_name, modelf, report_disconnect)
+            loop.run_until_complete(subscriber.connect(
+                args.server, args.port_notify, ssl_config=ssl_config))
+            exit_stack.register_coro(subscriber.close, loop=loop)
+            sub_clients[notifier_name] = subscriber
 
-    broadcast_clients = dict()
-    for target in "log", "ccb":
-        client = Receiver(target, [], report_disconnect)
-        loop.run_until_complete(client.connect(
-            args.server, args.port_broadcast, ssl_config=ssl_config))
-        atexit_register_coroutine(client.close, loop=loop)
-        broadcast_clients[target] = client
+        broadcast_clients = dict()
+        for target in "log", "ccb":
+            client = Receiver(target, [], report_disconnect)
+            loop.run_until_complete(client.connect(
+                args.server, args.port_broadcast, ssl_config=ssl_config))
+            exit_stack.register_coro(client.close, loop=loop)
+            broadcast_clients[target] = client
 
-    # initialize main window
-    main_window = MainWindow(args.server if server_name is None else server_name)
-    smgr.register(main_window)
-    mdi_area = MdiArea()
-    mdi_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-    mdi_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-    main_window.setCentralWidget(mdi_area)
+        # initialize main window
+        main_window = MainWindow(args.server if server_name is None else server_name)
+        smgr.register(main_window)
+        mdi_area = MdiArea()
+        mdi_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        mdi_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        main_window.setCentralWidget(mdi_area)
 
-    # create UI components
-    expmgr = experiments.ExperimentManager(main_window,
-                                           sub_clients["datasets"],
-                                           sub_clients["explist"],
-                                           sub_clients["schedule"],
-                                           rpc_clients["schedule"],
-                                           rpc_clients["experiment_db"])
-    smgr.register(expmgr)
-    d_shortcuts = shortcuts.ShortcutsDock(main_window, expmgr)
-    smgr.register(d_shortcuts)
-    d_explorer = explorer.ExplorerDock(expmgr, d_shortcuts,
-                                       sub_clients["explist"],
-                                       sub_clients["explist_status"],
-                                       rpc_clients["schedule"],
-                                       rpc_clients["experiment_db"],
-                                       rpc_clients["device_db"])
-    smgr.register(d_explorer)
+        # create UI components
+        expmgr = experiments.ExperimentManager(main_window,
+                                            sub_clients["datasets"],
+                                            sub_clients["explist"],
+                                            sub_clients["schedule"],
+                                            rpc_clients["schedule"],
+                                            rpc_clients["experiment_db"])
+        smgr.register(expmgr)
+        d_shortcuts = shortcuts.ShortcutsDock(main_window, expmgr)
+        smgr.register(d_shortcuts)
+        d_explorer = explorer.ExplorerDock(expmgr, d_shortcuts,
+                                        sub_clients["explist"],
+                                        sub_clients["explist_status"],
+                                        rpc_clients["schedule"],
+                                        rpc_clients["experiment_db"],
+                                        rpc_clients["device_db"])
+        smgr.register(d_explorer)
 
-    d_datasets = datasets.DatasetsDock(sub_clients["datasets"],
-                                       rpc_clients["dataset_db"],
-                                       loop)
-    smgr.register(d_datasets)
+        d_datasets = datasets.DatasetsDock(sub_clients["datasets"],
+                                        rpc_clients["dataset_db"],
+                                        loop)
+        smgr.register(d_datasets)
 
-    d_applets = applets_ccb.AppletsCCBDock(main_window,
-                                           sub_clients["datasets"],
-                                           rpc_clients["dataset_db"],
-                                           expmgr,
-                                           extra_substitutes={
-                                               "server": args.server,
-                                               "port_notify": args.port_notify,
-                                               "port_control": args.port_control,
-                                           },
-                                           loop=loop)
-    atexit_register_coroutine(d_applets.stop, loop=loop)
-    smgr.register(d_applets)
-    broadcast_clients["ccb"].notify_cbs.append(d_applets.ccb_notify)
+        d_applets = applets_ccb.AppletsCCBDock(main_window,
+                                            sub_clients["datasets"],
+                                            rpc_clients["dataset_db"],
+                                            expmgr,
+                                            extra_substitutes={
+                                                "server": args.server,
+                                                "port_notify": args.port_notify,
+                                                "port_control": args.port_control,
+                                            },
+                                            loop=loop)
+        exit_stack.register_coro(d_applets.stop, loop=loop)
+        smgr.register(d_applets)
+        broadcast_clients["ccb"].notify_cbs.append(d_applets.ccb_notify)
 
-    d_ttl_dds = moninj.MonInj(rpc_clients["schedule"], main_window)
-    smgr.register(d_ttl_dds)
-    atexit_register_coroutine(d_ttl_dds.stop, loop=loop)
+        d_ttl_dds = moninj.MonInj(rpc_clients["schedule"], main_window)
+        smgr.register(d_ttl_dds)
+        exit_stack.register_coro(d_ttl_dds.stop, loop=loop)
 
-    d_waveform = waveform.WaveformDock(
-        args.analyzer_proxy_timeout,
-        args.analyzer_proxy_timer,
-        args.analyzer_proxy_timer_backoff
-    )
-    atexit_register_coroutine(d_waveform.stop, loop=loop)
+        d_waveform = waveform.WaveformDock(
+            args.analyzer_proxy_timeout,
+            args.analyzer_proxy_timer,
+            args.analyzer_proxy_timer_backoff
+        )
+        exit_stack.register_coro(d_waveform.stop, loop=loop)
 
-    d_interactive_args = interactive_args.InteractiveArgsDock(
-        sub_clients["interactive_args"], sub_clients["schedule"],
-        rpc_clients["interactive_arg_db"])
-    smgr.register(d_interactive_args)
+        d_interactive_args = interactive_args.InteractiveArgsDock(
+            sub_clients["interactive_args"], sub_clients["schedule"],
+            rpc_clients["interactive_arg_db"])
+        smgr.register(d_interactive_args)
 
-    d_schedule = schedule.ScheduleDock(
-        rpc_clients["schedule"], sub_clients["schedule"])
-    smgr.register(d_schedule)
+        d_schedule = schedule.ScheduleDock(
+            rpc_clients["schedule"], sub_clients["schedule"])
+        smgr.register(d_schedule)
 
-    logmgr = log.LogDockManager(main_window)
-    smgr.register(logmgr)
-    broadcast_clients["log"].notify_cbs.append(logmgr.append_message)
-    widget_log_handler.callback = logmgr.append_message
+        logmgr = log.LogDockManager(main_window)
+        smgr.register(logmgr)
+        broadcast_clients["log"].notify_cbs.append(logmgr.append_message)
+        widget_log_handler.callback = logmgr.append_message
 
-    # lay out docks
-    right_docks = [
-        d_explorer, d_shortcuts,
-        d_datasets, d_applets,
-        d_waveform, d_interactive_args
-    ]
-    main_window.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, right_docks[0])
-    for d1, d2 in zip(right_docks, right_docks[1:]):
-        main_window.tabifyDockWidget(d1, d2)
-    main_window.addDockWidget(QtCore.Qt.DockWidgetArea.BottomDockWidgetArea, d_schedule)
+        # lay out docks
+        right_docks = [
+            d_explorer, d_shortcuts,
+            d_datasets, d_applets,
+            d_waveform, d_interactive_args
+        ]
+        main_window.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, right_docks[0])
+        for d1, d2 in zip(right_docks, right_docks[1:]):
+            main_window.tabifyDockWidget(d1, d2)
+        main_window.addDockWidget(QtCore.Qt.DockWidgetArea.BottomDockWidgetArea, d_schedule)
 
-    # load/initialize state
-    smgr.load()
+        # load/initialize state
+        smgr.load()
 
-    def init_cbs(ddb):
-        d_ttl_dds.dm.init_ddb(ddb)
-        d_waveform.init_ddb(ddb)
-        return ddb
-    devices_sub = Subscriber("devices", init_cbs, [d_ttl_dds.dm.notify_ddb, d_waveform.notify_ddb])
-    loop.run_until_complete(devices_sub.connect(args.server, args.port_notify, ssl_config=ssl_config))
-    atexit_register_coroutine(devices_sub.close, loop=loop)
+        def init_cbs(ddb):
+            d_ttl_dds.dm.init_ddb(ddb)
+            d_waveform.init_ddb(ddb)
+            return ddb
+        devices_sub = Subscriber("devices", init_cbs, [d_ttl_dds.dm.notify_ddb, d_waveform.notify_ddb])
+        loop.run_until_complete(devices_sub.connect(args.server, args.port_notify, ssl_config=ssl_config))
+        exit_stack.register_coro(devices_sub.close, loop=loop)
 
-    smgr.start(loop=loop)
-    atexit_register_coroutine(smgr.stop, loop=loop)
+        smgr.start(loop=loop)
+        exit_stack.register_coro(smgr.stop, loop=loop)
 
-    # create first log dock if not already in state
-    d_log0 = logmgr.first_log_dock()
-    if d_log0 is not None:
-        main_window.tabifyDockWidget(d_schedule, d_log0)
-    d_moninj0 = d_ttl_dds.first_moninj_dock()
-    if d_moninj0 is not None:
-        main_window.tabifyDockWidget(right_docks[-1], d_moninj0)
+        # create first log dock if not already in state
+        d_log0 = logmgr.first_log_dock()
+        if d_log0 is not None:
+            main_window.tabifyDockWidget(d_schedule, d_log0)
+        d_moninj0 = d_ttl_dds.first_moninj_dock()
+        if d_moninj0 is not None:
+            main_window.tabifyDockWidget(right_docks[-1], d_moninj0)
 
-    if server_name is not None:
-        server_description = server_name + " ({})".format(args.server)
-    else:
-        server_description = args.server
-    logging.info("ARTIQ dashboard %s connected to master %s",
-                 artiq_version, server_description)
-    # run
-    main_window.show()
-    loop.run_until_complete(main_window.exit_request.wait())
+        if server_name is not None:
+            server_description = server_name + " ({})".format(args.server)
+        else:
+            server_description = args.server
+        logging.info("ARTIQ dashboard %s connected to master %s",
+                    artiq_version, server_description)
+        # run
+        main_window.show()
+        loop.run_until_complete(main_window.exit_request.wait())
 
 
 if __name__ == "__main__":
