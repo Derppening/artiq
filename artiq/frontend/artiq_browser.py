@@ -2,7 +2,6 @@
 
 import argparse
 import asyncio
-import atexit
 import os
 import logging
 import sys
@@ -10,7 +9,7 @@ import sys
 from PyQt6 import QtCore, QtGui, QtWidgets
 from qasync import QEventLoop
 
-from sipyco.tools import atexit_register_coroutine
+from sipyco.tools import ExitStack
 from sipyco import common_args
 
 from artiq import __version__ as artiq_version
@@ -49,7 +48,7 @@ def get_argparser():
 
 class Browser(QtWidgets.QMainWindow):
     def __init__(self, smgr, dataset_sub, dataset_ctl, browse_root,
-                 *, loop=None):
+                 *, exit_stack, loop=None):
         QtWidgets.QMainWindow.__init__(self)
         smgr.register(self)
 
@@ -83,7 +82,7 @@ class Browser(QtWidgets.QMainWindow):
 
         self.applets = applets.AppletsDock(self, dataset_sub, dataset_ctl, self.experiments, loop=loop)
         smgr.register(self.applets)
-        atexit_register_coroutine(self.applets.stop, loop=loop)
+        exit_stack.register_coro(self.applets.stop, loop=loop)
 
         self.datasets = datasets.DatasetsDock(dataset_sub, dataset_ctl)
         smgr.register(self.datasets)
@@ -146,34 +145,35 @@ def main():
         # force XCB instead of Wayland due to applets not embedding
         forced_platform = ["-platform", "xcb"]
     app = QtWidgets.QApplication(["ARTIQ Browser"] + forced_platform)
-    loop = QEventLoop(app)
-    asyncio.set_event_loop(loop)
-    atexit.register(loop.close)
+    with ExitStack() as exit_stack:
+        loop = QEventLoop(app)
+        asyncio.set_event_loop(loop)
+        exit_stack.register(loop.close)
 
-    dataset_sub = models.LocalModelManager(datasets.Model)
-    dataset_sub.init({})
+        dataset_sub = models.LocalModelManager(datasets.Model)
+        dataset_sub.init({})
 
-    smgr = state.StateManager(args.db_file)
+        smgr = state.StateManager(args.db_file)
 
-    dataset_ctl = datasets.DatasetCtl(args.server, args.port)
-    browser = Browser(smgr, dataset_sub, dataset_ctl, args.browse_root,
-                      loop=loop)
-    widget_log_handler.callback = browser.log.model.append
+        dataset_ctl = datasets.DatasetCtl(args.server, args.port)
+        browser = Browser(smgr, dataset_sub, dataset_ctl, args.browse_root,
+                          exit_stack=exit_stack, loop=loop)
+        widget_log_handler.callback = browser.log.model.append
 
-    if os.name == "nt":
-        # HACK: show the main window before creating applets.
-        # Otherwise, the windows of those applets that are in detached
-        # QDockWidgets fail to be embedded.
+        if os.name == "nt":
+            # HACK: show the main window before creating applets.
+            # Otherwise, the windows of those applets that are in detached
+            # QDockWidgets fail to be embedded.
+            browser.show()
+        smgr.load()
+        smgr.start(loop=loop)
+        exit_stack.register_coro(smgr.stop, loop=loop)
+
+        if args.select is not None:
+            browser.files.select(args.select)
+
         browser.show()
-    smgr.load()
-    smgr.start(loop=loop)
-    atexit_register_coroutine(smgr.stop, loop=loop)
-
-    if args.select is not None:
-        browser.files.select(args.select)
-
-    browser.show()
-    loop.run_until_complete(browser.exit_request.wait())
+        loop.run_until_complete(browser.exit_request.wait())
 
 
 if __name__ == "__main__":
