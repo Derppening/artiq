@@ -4,7 +4,6 @@ import argparse
 import os
 import struct
 import tempfile
-import atexit
 
 from sipyco import common_args
 
