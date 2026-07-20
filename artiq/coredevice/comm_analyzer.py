@@ -263,6 +263,9 @@ class VCDManager:
         yield
         self.out.write("$upscope $end\n")
 
+    def end_definitions(self):
+        self.out.write("$enddefinitions $end\n")
+
     def set_time(self, time):
         time -= self.start_time
         if time != self.current_time:
@@ -302,6 +305,9 @@ class WaveformManager:
         self.current_scope = scope + "/"
         yield
         self.current_scope = old_scope
+
+    def end_definitions(self):
+        pass
 
     def set_time(self, time):
         time -= self.start_time
@@ -745,6 +751,9 @@ def decoded_dump_to_target(manager, devices, dump, uniform_interval):
     slack = manager.get_channel("rtio_slack", 64, ty=WaveformType.ANALOG)
 
     stopped_messages = []
+
+    # mark end of VCD header
+    manager.end_definitions()
 
     manager.set_time(0)
     start_time = 0
