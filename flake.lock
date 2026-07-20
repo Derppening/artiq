@@ -12,11 +12,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1784349788,
-        "narHash": "sha256-Osc9p7GzK4bggJuuJpkfkMNry3VMJhnrluvYHmaHXY0=",
+        "lastModified": 1784561780,
+        "narHash": "sha256-Uip+vQFtJi25zwzHDyqt/zExlNrCtoZesZMnSD0k/6M=",
         "ref": "refs/heads/master",
-        "rev": "cb8b5a05ed0e9fd7304f423602a588f6134dfd13",
-        "revCount": 57,
+        "rev": "26491e581fad362e0d9579e164a04e98d7c5e5e0",
+        "revCount": 60,
         "type": "git",
         "url": "https://git.m-labs.hk/M-Labs/artiq-comtools.git"
       },
@@ -70,11 +70,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1784022890,
-        "narHash": "sha256-8R7gSbU0thfWfJ9m/JWe9NXvoLzc8L9y2AyiQptTOq4=",
+        "lastModified": 1784547126,
+        "narHash": "sha256-AxrLrEbkPGggstwA2vIBQ70+QJCibfVfyHz2B0+p82M=",
         "ref": "refs/heads/master",
-        "rev": "2bb348c972d15cbaf221505f9c397f114a30cccd",
-        "revCount": 2222,
+        "rev": "b150ae9c9c26a1237a1b48271fd3020dfdd0ac86",
+        "revCount": 2225,
         "type": "git",
         "url": "https://git.m-labs.hk/M-Labs/nac3.git"
       },
@@ -177,11 +177,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1784348920,
-        "narHash": "sha256-/XgcTLa3qwSfL29ZJbiI7rih7Yi/bY0w6UGm0DgAraI=",
+        "lastModified": 1784561711,
+        "narHash": "sha256-GrBn7YzGshyf4zOqzupCrikskGIrHQirkUFUv2r6UfU=",
         "ref": "refs/heads/master",
-        "rev": "9956a425ab47a8c02b662e38ca7e1e6c9a9ca843",
-        "revCount": 160,
+        "rev": "3dbd9935e0573d84d13aff142e325129f4a8ee08",
+        "revCount": 165,
         "type": "git",
         "url": "https://git.m-labs.hk/M-Labs/sipyco.git"
       },
