@@ -585,8 +585,8 @@ class ADF5356:
 
         See the "Register Map, Register 6, Negative Bleed" documentation.
         """
-        return 1 if ((self.pll_frac1() == 0) and (self.pll_frac2() == 0)
-                and (float(self.f_pfd()) <= 100. * MHz)) else 0
+        return 0 if (((self.pll_frac1() == 0) and (self.pll_frac2() == 0))
+                or (self.f_pfd() > 100. * MHz)) else 1
 
     @portable
     def _update_vco_timeout(self, f_pfd: int64):
