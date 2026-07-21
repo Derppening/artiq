@@ -820,7 +820,11 @@ class CommKernel:
                                              exn_type.__module__,
                                              exn_type.__qualname__)
                 self._write_int32(embedding_map.store_str(name))
-                self._write_int32(embedding_map.store_str(self._truncate_message(str(exn))))
+                # Contrary to the docs, KeyError message given by str(exn) is
+                # inconsistent to the argument.
+                # https://bugs.python.org/issue2651
+                exn_str = str(exn.args[0] if exn_type is KeyError else exn)
+                self._write_int32(embedding_map.store_str(self._truncate_message(exn_str)))
                 for index in range(3):
                     self._write_int64(0)
 
