@@ -36,13 +36,16 @@ class TestCompile(ExperimentCase):
     def test_compile(self):
         core_addr = self.device_mgr.get_desc("core")["arguments"]["host"]
         mgmt = CommMgmt(core_addr)
-        mgmt.clear_log()
-        with tempfile.TemporaryDirectory() as tmp:
-            db_path = os.path.join(artiq_root, "device_db.py")
-            subprocess.check_call([sys.executable, "-m", "artiq.frontend.artiq_compile", "--device-db", db_path,
-                "-c", "CheckLog", "-o", os.path.join(tmp, "check_log.elf"), __file__])
-            subprocess.check_call([sys.executable, "-m", "artiq.frontend.artiq_run", "--device-db", db_path,
-                os.path.join(tmp, "check_log.elf")])
-        log = mgmt.get_log()
-        self.assertIn("test_artiq_compile", log)
-        mgmt.close()
+        try:
+            mgmt.open()
+            mgmt.clear_log()
+            with tempfile.TemporaryDirectory() as tmp:
+                db_path = os.path.join(artiq_root, "device_db.py")
+                subprocess.check_call([sys.executable, "-m", "artiq.frontend.artiq_compile", "--device-db", db_path,
+                    "-c", "CheckLog", "-o", os.path.join(tmp, "check_log.elf"), __file__])
+                subprocess.check_call([sys.executable, "-m", "artiq.frontend.artiq_run", "--device-db", db_path,
+                    os.path.join(tmp, "check_log.elf")])
+            log = mgmt.get_log()
+            self.assertIn("test_artiq_compile", log)
+        finally:
+            mgmt.close()

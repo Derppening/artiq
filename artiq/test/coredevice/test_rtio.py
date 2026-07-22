@@ -741,6 +741,7 @@ class CoredeviceTest(ExperimentCase):
         core_addr = self.device_mgr.get_desc("core")["arguments"]["host"]
         mgmt = CommMgmt(core_addr)
         try:
+            mgmt.open()
             mgmt.clear_log()
             self.execute(experiment)
             log = mgmt.get_log()

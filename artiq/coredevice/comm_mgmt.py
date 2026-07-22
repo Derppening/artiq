@@ -45,8 +45,6 @@ class CommMgmt:
         self.drtio_dest = drtio_dest
 
     def open(self):
-        if hasattr(self, "socket"):
-            return
         self.socket = create_connection(self.host, self.port)
         self.socket.sendall(b"ARTIQ management\n")
         self._write_int8(self.drtio_dest)
@@ -59,10 +57,7 @@ class CommMgmt:
             raise IOError("Incorrect reply from device: expected e/E.")
 
     def close(self):
-        if not hasattr(self, "socket"):
-            return
         self.socket.close()
-        del self.socket
         logger.debug("disconnected")
 
     # Protocol elements
@@ -71,8 +66,6 @@ class CommMgmt:
         self.socket.sendall(data)
 
     def _write_header(self, ty):
-        self.open()
-
         logger.debug("sending message: type=%r", ty)
         self._write(struct.pack("B", ty.value))
 

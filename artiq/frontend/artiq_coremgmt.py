@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import atexit
 import os
 import struct
 import tempfile
@@ -140,6 +141,8 @@ def main():
     else:
         core_addr = args.device
     mgmt = CommMgmt(core_addr, drtio_dest=args.drtio_dest)
+    mgmt.open()
+    atexit.register(mgmt.close)
 
     if args.tool == "log":
         if args.action == "clear":
