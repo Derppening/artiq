@@ -168,7 +168,9 @@ class CommMgmt:
         self._write_header(Request.DebugAllocator)
 
     def flash(self, bin_paths):
+        print("Setting device to flash mode...", end="", flush=True)
         self._write_header(Request.Flash)
+        print("done")
 
         with io.BytesIO() as image_buf:
             for filename in bin_paths:
@@ -182,6 +184,10 @@ class CommMgmt:
             crc = binascii.crc32(image_buf.getvalue())
             image_buf.write(struct.pack(self.endian + "I", crc))
 
+            print("Writing image to device...", end="", flush=True)
             self._write_bytes(image_buf.getvalue())
+            print("done")
 
+        print("Waiting for device reboot...", end="", flush=True)
         self._read_expect(Reply.RebootImminent)
+        print("rebooting")
