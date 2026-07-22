@@ -522,7 +522,6 @@
                   artiq
                   ps.paramiko
                 ]
-                ++ ps.paramiko.optional-dependencies.ed25519
           ))
           pkgs.openssh
           packages.x86_64-linux.openocd-bscanspi # for the bscanspi bitstreams
