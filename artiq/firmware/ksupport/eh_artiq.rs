@@ -357,7 +357,7 @@ extern "C" fn stop_fn(
     }
 }
 
-// Must be kept in sync with `nac3artiq::Nac3::new`
+// Must be kept in sync with `nac3artiq::RUNTIME_EXCEPTION_NAMES`
 static EXCEPTION_ID_LOOKUP: [(&str, u32); 25] = [
     ("RTIOUnderflow", 0),
     ("RTIOOverflow", 1),
