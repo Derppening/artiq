@@ -1,14 +1,16 @@
 import unittest
 import linecache
-import artiq.coredevice.exceptions as exceptions
+
+from numpy import int32
+
 import nac3artiq
 
 from artiq.experiment import *
 from artiq.test.hardware_testbench import ExperimentCase
-from artiq.language.embedding_map import EmbeddingMap
 from artiq.coredevice.core import Core, test_exception_id_sync
 from artiq.coredevice.dma import CoreDMA
-from numpy import int32
+import artiq.coredevice.exceptions as exceptions
+
 
 """
 Test sync in exceptions raised between host and kernel
