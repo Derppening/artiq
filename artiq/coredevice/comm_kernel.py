@@ -16,6 +16,7 @@ from artiq import __version__ as software_version
 from artiq import __artiq_dir__ as artiq_dir
 
 from sipyco.keepalive import create_connection
+from sipyco.packed_exceptions import get_exc_message
 
 logger = logging.getLogger(__name__)
 
@@ -820,10 +821,7 @@ class CommKernel:
                                              exn_type.__module__,
                                              exn_type.__qualname__)
                 self._write_int32(embedding_map.store_str(name))
-                # Contrary to the docs, KeyError message given by str(exn) is
-                # inconsistent to the argument.
-                # https://bugs.python.org/issue2651
-                exn_str = str(exn.args[0] if exn_type is KeyError else exn)
+                exn_str = get_exc_message(exn)
                 self._write_int32(embedding_map.store_str(self._truncate_message(exn_str)))
                 for index in range(3):
                     self._write_int64(0)

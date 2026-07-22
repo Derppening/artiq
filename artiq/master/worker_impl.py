@@ -19,7 +19,7 @@ import threading
 import h5py
 
 from sipyco import pipe_ipc, pyon
-from sipyco.packed_exceptions import raise_packed_exc
+from sipyco.packed_exceptions import get_exc_message, raise_packed_exc
 from sipyco.logs import multiline_log_config
 
 import artiq
@@ -246,10 +246,7 @@ def put_completed():
 def put_exception_report():
     _, exc, _ = sys.exc_info()
     short_exc_info = type(exc).__name__
-    # Contrary to the docs, KeyError message given by str(exc) is
-    # inconsistent to the argument.
-    # https://bugs.python.org/issue2651
-    exc_str = str(exc.args[0] if type(exc) is KeyError else exc)
+    exc_str = get_exc_message(exc)
     if exc_str:
         short_exc_info += ": " + exc_str.splitlines()[0]
     lines = ["Terminating with exception ("+short_exc_info+")\n"]
