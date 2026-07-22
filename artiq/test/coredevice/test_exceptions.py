@@ -1,6 +1,7 @@
 import unittest
 import linecache
 import artiq.coredevice.exceptions as exceptions
+import nac3artiq
 
 from artiq.experiment import *
 from artiq.test.hardware_testbench import ExperimentCase
@@ -19,7 +20,7 @@ Considers the following two cases:
 Ensures same exception is raised on both kernel and host in either case
 """
 
-exception_names = EmbeddingMap().string_map
+exception_names = nac3artiq.RUNTIME_EXCEPTION_NAMES
 
 
 @compile
@@ -46,7 +47,8 @@ class ExceptionTest(ExperimentCase):
     def test_raise_exceptions_kernel(self):
         exp = self.create(_TestExceptionSync)
         
-        for id, name in exception_names.items():
+        # Exceptions are always the first to be assigned IDs
+        for id, name in enumerate(exception_names):
             name = name.split('.')[-1].split(':')[-1]
             with self.assertRaises(getattr(exceptions, name)) as ctx:
                 exp.raise_exception_kernel(id)
@@ -56,7 +58,7 @@ class ExceptionTest(ExperimentCase):
     def test_raise_exceptions_host(self):
         exp = self.create(_TestExceptionSync)
 
-        for id, name in exception_names.items():
+        for id, name in enumerate(exception_names):
             name = name.split('.')[-1].split(':')[-1]
             with self.assertRaises(getattr(exceptions, name)) as ctx:
                 exp.raise_exception_host(id)
