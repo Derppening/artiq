@@ -177,11 +177,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1784561711,
-        "narHash": "sha256-GrBn7YzGshyf4zOqzupCrikskGIrHQirkUFUv2r6UfU=",
+        "lastModified": 1784687718,
+        "narHash": "sha256-M04PsE0uJegYuhN9DNDnhihcUVD8vOzFSHYcEUi3548=",
         "ref": "refs/heads/master",
-        "rev": "3dbd9935e0573d84d13aff142e325129f4a8ee08",
-        "revCount": 165,
+        "rev": "986ef9bb147d32069fa0601cc518cf7b2b1d0072",
+        "revCount": 167,
         "type": "git",
         "url": "https://git.m-labs.hk/M-Labs/sipyco.git"
       },
