@@ -475,7 +475,7 @@ class EEMSerdes(Module, TransceiverInterface, AutoCSR):
     def __init__(self, platform, data_pads):
         self.rx_ready = CSRStorage()
 
-        self.transceiver_sel = CSRStorage(max(1, log2_int(len(data_pads))))
+        self.transceiver_sel = CSRStorage(max(1, bits_for(len(data_pads))))
         self.lane_sel = CSRStorage(2)
 
         self.bitslip = CSR()
