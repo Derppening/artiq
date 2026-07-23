@@ -11,12 +11,12 @@ from artiq.coredevice.ad9912 import AD9912
 from artiq.coredevice.ad9910 import AD9910, SyncDataUser as AD9910Sync
 from artiq.coredevice.ttl import TTLOut
 from artiq.coredevice.sampler import Sampler
-from artiq.coredevice.suservo import SUServo, Channel as SUServoChannel, SyncDataUser as SUServoSync
+from artiq.coredevice import suservo
 from artiq.coredevice.edge_counter import EdgeCounter
 from artiq.coredevice.grabber import Grabber
 from artiq.coredevice.fastino import Fastino
 from artiq.coredevice.phaser import Phaser
-from artiq.coredevice.shuttler import DCBias as ShuttlerDCBias, DDS as ShuttlerDDS
+from artiq.coredevice import shuttler
 
 
 @compile
@@ -33,14 +33,14 @@ class NAC3Devices(EnvExperiment):
     urukul1_cpld: KernelInvariant[UrukulCPLD[ProtoRev9]]
     urukul1_ch0: KernelInvariant[AD9910[AD9910Sync]]
     sampler0: KernelInvariant[Sampler]
-    suservo0: Kernel[SUServo[SUServoSync]]
-    suservo0_ch0: KernelInvariant[SUServoChannel[SUServoSync]]
+    suservo0: Kernel[suservo.SUServo[Auto]]
+    suservo0_ch0: KernelInvariant[suservo.Channel[Auto]]
     ttl0_counter: KernelInvariant[EdgeCounter]
     grabber0: KernelInvariant[Grabber]
     fastino0: KernelInvariant[Fastino]
     phaser0: KernelInvariant[Phaser]
-    shuttler0_dcbias0: KernelInvariant[ShuttlerDCBias]
-    shuttler0_dds0: KernelInvariant[ShuttlerDDS]
+    shuttler0_dcbias0: KernelInvariant[shuttler.DCBias]
+    shuttler0_dds0: KernelInvariant[shuttler.DDS]
 
     def build(self):
         self.setattr_device("core")
