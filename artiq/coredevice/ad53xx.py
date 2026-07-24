@@ -14,13 +14,13 @@ from artiq.language.core import *
 from artiq.language.units import ns, us
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLOut
-from artiq.coredevice.spi2 import *
+from artiq.coredevice import spi2 as spi
 
 
-SPI_AD53XX_CONFIG = (0*SPI_OFFLINE | 1*SPI_END |
-                     0*SPI_INPUT | 0*SPI_CS_POLARITY |
-                     0*SPI_CLK_POLARITY | 1*SPI_CLK_PHASE |
-                     0*SPI_LSB_FIRST | 0*SPI_HALF_DUPLEX)
+SPI_AD53XX_CONFIG = (0*spi.SPI_OFFLINE | 1*spi.SPI_END |
+                     0*spi.SPI_INPUT | 0*spi.SPI_CS_POLARITY |
+                     0*spi.SPI_CLK_POLARITY | 1*spi.SPI_CLK_PHASE |
+                     0*spi.SPI_LSB_FIRST | 0*spi.SPI_HALF_DUPLEX)
 
 AD53XX_CMD_DATA = 3 << 22
 AD53XX_CMD_OFFSET = 2 << 22
@@ -142,7 +142,7 @@ class AD53xx:
     :param core_device: Core device name (default: "core")
     """
     core: KernelInvariant[Core]
-    bus: KernelInvariant[SPIMaster]
+    bus: KernelInvariant[spi.SPIMaster]
     ldac: KernelInvariant[TTLOut]
     clr: KernelInvariant[TTLOut]
     chip_select: KernelInvariant[int32]
@@ -216,7 +216,7 @@ class AD53xx:
         :return: The 16-bit register value
         """
         self.bus.write(ad53xx_cmd_read_ch(channel, op) << 8)
-        self.bus.set_config_mu(SPI_AD53XX_CONFIG | SPI_INPUT, 24,
+        self.bus.set_config_mu(SPI_AD53XX_CONFIG | spi.SPI_INPUT, 24,
                                self.div_read, self.chip_select)
         self.core.delay(270.*ns)  # t_21 min sync high in readback
         self.bus.write((AD53XX_CMD_SPECIAL | AD53XX_SPECIAL_NOP) << 8)
