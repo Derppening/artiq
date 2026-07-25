@@ -12,8 +12,8 @@ from artiq.coredevice.rtio import rtio_output, rtio_input_data
 from artiq.coredevice.spi2 import SPI_END, SPIMaster
 from artiq.coredevice import ad9910, urukul, sampler
 from artiq.coredevice.ttl import TTLOut
-from artiq.coredevice.urukul import CPLD
-from artiq.coredevice.ad9910 import AD9910, STA_PROTO_REV_9, SyncDataUser as AD9910SyncData
+from artiq.coredevice.urukul import CPLD, STA_PROTO_REV_9
+from artiq.coredevice.ad9910 import AD9910, SyncDataUser as AD9910SyncData
 from artiq.coredevice.sampler import adc_mu_to_volt as sampler_adc_mu_to_volt, SPI_CONFIG as SAMPLER_SPI_CONFIG, SPI_CS_PGIA as SAMPLER_SPI_CS_PGIA
 
 

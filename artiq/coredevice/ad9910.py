@@ -6,8 +6,9 @@ from numpy import int32, int64, uint32
 from artiq.language.core import *
 from artiq.language.units import us, ms
 
-from artiq.coredevice.spi2 import *
-from artiq.coredevice.urukul import *
+from artiq.coredevice.core import *
+from artiq.coredevice import spi2 as spi
+from artiq.coredevice import urukul
 from artiq.coredevice.ttl import TTLOut
 from artiq.coredevice.kasli_i2c import KasliEEPROM  # NAC3TODO
 
@@ -152,8 +153,8 @@ class AD9910(Generic[SyncDataT]):
     """
 
     core: KernelInvariant[Core]
-    cpld: KernelInvariant[CPLD[Auto]]
-    bus: KernelInvariant[SPIMaster]
+    cpld: KernelInvariant[urukul.CPLD[Auto]]
+    bus: KernelInvariant[spi.SPIMaster]
     chip_select: KernelInvariant[int32]
     pll_en: KernelInvariant[bool]
     pll_n: KernelInvariant[int32]
@@ -164,7 +165,7 @@ class AD9910(Generic[SyncDataT]):
     sysclk: KernelInvariant[float]
     sw: KernelInvariant[Option[TTLOut]]
     sync_data: KernelInvariant[SyncDataT]
-    io_update: Kernel[IOUpdate]
+    io_update: Kernel[urukul.IOUpdate]
     phase_mode: Kernel[int32]
 
     def __init__(self, dmgr, chip_select, cpld_device, sw_device=None,
@@ -206,7 +207,7 @@ class AD9910(Generic[SyncDataT]):
         self.sysclk_per_mu = int(round(sysclk * self.core.ref_period))
         self.sysclk = sysclk
 
-        self.io_update = IOUpdate(self.cpld, self.chip_select, use_mask_nu=shared)
+        self.io_update = urukul.IOUpdate(self.cpld, self.chip_select, use_mask_nu=shared)
 
         # NAC3TODO
         if isinstance(sync_delay_seed, str) or isinstance(io_update_delay,
@@ -271,8 +272,8 @@ class AD9910(Generic[SyncDataT]):
         :param addr: Register address
         :param data: Data to be written
         """
-        self.bus.set_config_mu(SPI_CONFIG | SPI_END, 24,
-                               SPIT_DDS_WR, self.chip_select)
+        self.bus.set_config_mu(urukul.SPI_CONFIG | spi.SPI_END, 24,
+                               urukul.SPIT_DDS_WR, self.chip_select)
         self.bus.write((addr << 24) | ((data & 0xffff) << 8))
 
     @kernel
@@ -282,11 +283,11 @@ class AD9910(Generic[SyncDataT]):
         :param addr: Register address
         :param data: Data to be written
         """
-        self.bus.set_config_mu(SPI_CONFIG, 8,
-                               SPIT_DDS_WR, self.chip_select)
+        self.bus.set_config_mu(urukul.SPI_CONFIG, 8,
+                               urukul.SPIT_DDS_WR, self.chip_select)
         self.bus.write(addr << 24)
-        self.bus.set_config_mu(SPI_CONFIG | SPI_END, 32,
-                               SPIT_DDS_WR, self.chip_select)
+        self.bus.set_config_mu(urukul.SPI_CONFIG | spi.SPI_END, 32,
+                               urukul.SPIT_DDS_WR, self.chip_select)
         self.bus.write(data)
 
     @kernel
@@ -295,12 +296,12 @@ class AD9910(Generic[SyncDataT]):
 
         :param addr: Register address
         """
-        self.bus.set_config_mu(SPI_CONFIG, 8,
-                               SPIT_DDS_WR, self.chip_select)
+        self.bus.set_config_mu(urukul.SPI_CONFIG, 8,
+                               urukul.SPIT_DDS_WR, self.chip_select)
         self.bus.write((addr | 0x80) << 24)
         self.bus.set_config_mu(
-            SPI_CONFIG | SPI_END | SPI_INPUT,
-            16, SPIT_DDS_RD, self.chip_select)
+            urukul.SPI_CONFIG | spi.SPI_END | spi.SPI_INPUT,
+            16, urukul.SPIT_DDS_RD, self.chip_select)
         self.bus.write(0)
         return self.bus.read()
 
@@ -310,12 +311,12 @@ class AD9910(Generic[SyncDataT]):
 
         :param addr: Register address
         """
-        self.bus.set_config_mu(SPI_CONFIG, 8,
-                               SPIT_DDS_WR, self.chip_select)
+        self.bus.set_config_mu(urukul.SPI_CONFIG, 8,
+                               urukul.SPIT_DDS_WR, self.chip_select)
         self.bus.write((addr | 0x80) << 24)
         self.bus.set_config_mu(
-            SPI_CONFIG | SPI_END | SPI_INPUT,
-            32, SPIT_DDS_RD, self.chip_select)
+            urukul.SPI_CONFIG | spi.SPI_END | spi.SPI_INPUT,
+            32, urukul.SPIT_DDS_RD, self.chip_select)
         self.bus.write(0)
         return self.bus.read()
 
@@ -327,16 +328,16 @@ class AD9910(Generic[SyncDataT]):
         :return: 64-bit integer register value
         """
         self.bus.set_config_mu(
-            SPI_CONFIG, 8,
-            SPIT_DDS_WR, self.chip_select)
+            urukul.SPI_CONFIG, 8,
+            urukul.SPIT_DDS_WR, self.chip_select)
         self.bus.write((addr | 0x80) << 24)
         self.bus.set_config_mu(
-            SPI_CONFIG | SPI_INPUT, 32,
-            SPIT_DDS_RD, self.chip_select)
+            urukul.SPI_CONFIG | spi.SPI_INPUT, 32,
+            urukul.SPIT_DDS_RD, self.chip_select)
         self.bus.write(0)
         self.bus.set_config_mu(
-            SPI_CONFIG | SPI_END | SPI_INPUT, 32,
-            SPIT_DDS_RD, self.chip_select)
+            urukul.SPI_CONFIG | spi.SPI_END | spi.SPI_INPUT, 32,
+            urukul.SPIT_DDS_RD, self.chip_select)
         self.bus.write(0)
         hi = self.bus.read()
         lo = self.bus.read()
@@ -350,14 +351,14 @@ class AD9910(Generic[SyncDataT]):
         :param data_high: High (MSB) 32 data bits
         :param data_low: Low (LSB) 32 data bits
         """
-        self.bus.set_config_mu(SPI_CONFIG, 8,
-                               SPIT_DDS_WR, self.chip_select)
+        self.bus.set_config_mu(urukul.SPI_CONFIG, 8,
+                               urukul.SPIT_DDS_WR, self.chip_select)
         self.bus.write(addr << 24)
-        self.bus.set_config_mu(SPI_CONFIG, 32,
-                               SPIT_DDS_WR, self.chip_select)
+        self.bus.set_config_mu(urukul.SPI_CONFIG, 32,
+                               urukul.SPIT_DDS_WR, self.chip_select)
         self.bus.write(data_high)
-        self.bus.set_config_mu(SPI_CONFIG | SPI_END, 32,
-                               SPIT_DDS_WR, self.chip_select)
+        self.bus.set_config_mu(urukul.SPI_CONFIG | spi.SPI_END, 32,
+                               urukul.SPIT_DDS_WR, self.chip_select)
         self.bus.write(data_low)
 
     @kernel
@@ -371,15 +372,15 @@ class AD9910(Generic[SyncDataT]):
 
         :param data: Data to be written to RAM.
         """
-        self.bus.set_config_mu(SPI_CONFIG, 8, SPIT_DDS_WR,
+        self.bus.set_config_mu(urukul.SPI_CONFIG, 8, urukul.SPIT_DDS_WR,
                                self.chip_select)
         self.bus.write(_AD9910_REG_RAM << 24)
-        self.bus.set_config_mu(SPI_CONFIG, 32,
-                               SPIT_DDS_WR, self.chip_select)
+        self.bus.set_config_mu(urukul.SPI_CONFIG, 32,
+                               urukul.SPIT_DDS_WR, self.chip_select)
         for i in range(len(data) - 1):
             self.bus.write(int32(data[i]))
-        self.bus.set_config_mu(SPI_CONFIG | SPI_END, 32,
-                               SPIT_DDS_WR, self.chip_select)
+        self.bus.set_config_mu(urukul.SPI_CONFIG | spi.SPI_END, 32,
+                               urukul.SPIT_DDS_WR, self.chip_select)
         self.bus.write(int32(data[len(data) - 1]))
 
     @kernel
@@ -393,21 +394,21 @@ class AD9910(Generic[SyncDataT]):
 
         :param data: List to be filled with data read from RAM.
         """
-        self.bus.set_config_mu(SPI_CONFIG, 8, SPIT_DDS_WR,
+        self.bus.set_config_mu(urukul.SPI_CONFIG, 8, urukul.SPIT_DDS_WR,
                                self.chip_select)
         self.bus.write((_AD9910_REG_RAM | 0x80) << 24)
         n = len(data) - 1
         if n > 0:
-            self.bus.set_config_mu(SPI_CONFIG | SPI_INPUT, 32,
-                                   SPIT_DDS_RD, self.chip_select)
+            self.bus.set_config_mu(urukul.SPI_CONFIG | spi.SPI_INPUT, 32,
+                                   urukul.SPIT_DDS_RD, self.chip_select)
         preload = min(n, 8)
         for i in range(n):
             self.bus.write(0)
             if i >= preload:
                 data[i - preload] = uint32(self.bus.read())
         self.bus.set_config_mu(
-            SPI_CONFIG | SPI_INPUT | SPI_END, 32,
-            SPIT_DDS_RD, self.chip_select)
+            urukul.SPI_CONFIG | spi.SPI_INPUT | spi.SPI_END, 32,
+            urukul.SPIT_DDS_RD, self.chip_select)
         self.bus.write(0)
         for i in range(preload + 1):
             data[(n - preload) + i] = uint32(self.bus.read())
@@ -546,7 +547,7 @@ class AD9910(Generic[SyncDataT]):
                 # Wait for PLL lock, up to 100 ms
                 for i in range(100):
                     sta = self.cpld.sta_read()
-                    lock = urukul_sta_pll_lock(sta)
+                    lock = urukul.urukul_sta_pll_lock(sta)
                     self.core.delay(1. * ms)
                     if self.chip_select == 3:
                         lock_bit_offset = dds_channel_idx
@@ -579,7 +580,7 @@ class AD9910(Generic[SyncDataT]):
                asf: uint32 = uint32(0x3fff),
                phase_mode: int32 = _PHASE_MODE_DEFAULT,
                ref_time_mu: int64 = int64(-1),
-               profile: int32 = DEFAULT_PROFILE,
+               profile: int32 = urukul.DEFAULT_PROFILE,
                ram_destination: int32 = -1) -> uint32:
         """Set DDS data in machine units.
 
@@ -657,7 +658,7 @@ class AD9910(Generic[SyncDataT]):
         return pow_
 
     @kernel
-    def get_mu(self, profile: int32 = DEFAULT_PROFILE
+    def get_mu(self, profile: int32 = urukul.DEFAULT_PROFILE
                ) -> tuple[uint32, uint32, uint32]:
         """Get the frequency tuning word, phase offset word,
         and amplitude scale factor.
@@ -910,7 +911,7 @@ class AD9910(Generic[SyncDataT]):
     @kernel
     def set(self, frequency: float = 0.0, phase: float = 0.0,
             amplitude: float = 1.0, phase_mode: int32 = _PHASE_MODE_DEFAULT,
-            ref_time_mu: int64 = int64(-1), profile: int32 = DEFAULT_PROFILE,
+            ref_time_mu: int64 = int64(-1), profile: int32 = urukul.DEFAULT_PROFILE,
             ram_destination: int32 = -1) -> float:
         """Set DDS data in SI units.
 
@@ -931,7 +932,7 @@ class AD9910(Generic[SyncDataT]):
             profile, ram_destination))
 
     @kernel
-    def get(self, profile: int32 = DEFAULT_PROFILE
+    def get(self, profile: int32 = urukul.DEFAULT_PROFILE
             ) -> tuple[float, float, float]:
         """Get the frequency, phase, and amplitude.
 
@@ -1136,7 +1137,7 @@ class AD9910(Generic[SyncDataT]):
                 self.clear_smp_err()
                 # integrate SMP_ERR statistics for a few hundred cycles
                 self.core.delay(100. * us)
-                err = urukul_sta_smp_err(self.cpld.sta_read())
+                err = urukul.urukul_sta_smp_err(self.cpld.sta_read())
                 self.core.delay(100. * us)  # slack
                 err_offset = dds_channel_idx if self.chip_select == 3 else (self.chip_select - 4)
                 if not bool((err >> err_offset) & 1):
