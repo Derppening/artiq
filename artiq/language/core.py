@@ -19,6 +19,7 @@ __all__ = [
     "extern", "kernel", "portable", "compile",
     "rpc", "print_rpc",
     "Option", "Some", "none", "UnwrapNoneError",
+    "critical",
     "set_time_manager",
     "parallel", "legacy_parallel", "sequential",
     "delay_mu", "now_mu", "at_mu",
@@ -166,6 +167,19 @@ def Some(v: T) -> Option[T]:
     return Option(v)
 
 none = Option(None)
+
+
+class critical:
+    # Keep the default in sync with `CTRC_DEFAULT_RESERVED_PAGES` in `nac3core/src/codegen/allocator.rs`
+    def __init__(self, num_free_pages=16):
+        pass
+
+    def __enter__(self):
+        pass
+
+    # NAC3's `critical.__exit__` is nullary, but CPython passes the exception triple.
+    def __exit__(self, *exc):
+        pass
 
 
 class _DummyTimeManager:

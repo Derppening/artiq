@@ -201,6 +201,7 @@ class Core:
                 "none": none,
                 "virtual": virtual,
                 "Option": Option,
+                "critical": critical,
 
                 # Decorator functions
                 "compile": compile,
