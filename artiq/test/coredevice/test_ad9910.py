@@ -5,7 +5,6 @@ from artiq.coredevice.ad9910 import (
     _AD9910_REG_FTW,
     _AD9910_REG_PROFILE0,
     AD9910,
-    DEFAULT_PROFILE,
     RAM_DEST_FTW,
     RAM_MODE_RAMPUP,
     SyncDataT,
@@ -17,6 +16,7 @@ from artiq.coredevice.urukul import (
     STA_PROTO_REV_9,
     ProtoRev8,
     ProtoRev9,
+    DEFAULT_PROFILE,
     urukul_sta_smp_err,
 )
 from artiq.experiment import *
