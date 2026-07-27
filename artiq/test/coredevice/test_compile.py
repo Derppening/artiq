@@ -36,8 +36,8 @@ class TestCompile(ExperimentCase):
     def test_compile(self):
         core_addr = self.device_mgr.get_desc("core")["arguments"]["host"]
         mgmt = CommMgmt(core_addr)
+        mgmt.open()
         try:
-            mgmt.open()
             mgmt.clear_log()
             with tempfile.TemporaryDirectory() as tmp:
                 db_path = os.path.join(artiq_root, "device_db.py")

@@ -740,8 +740,8 @@ class CoredeviceTest(ExperimentCase):
     def execute_and_test_in_log(self, experiment, string):
         core_addr = self.device_mgr.get_desc("core")["arguments"]["host"]
         mgmt = CommMgmt(core_addr)
+        mgmt.open()
         try:
-            mgmt.open()
             mgmt.clear_log()
             self.execute(experiment)
             log = mgmt.get_log()
