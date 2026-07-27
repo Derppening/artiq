@@ -18,7 +18,12 @@ class DUT(Module):
         self.submodules.roi_packer = ROIPacker(tracker.tracked_pixels)
 
 
-def run(dut, fragment, frame, x0, y0, x1, y1, max_pixel_per_cycle, pixel_width):
+def run(frame, x0, y0, x1, y1, max_pixel_per_cycle, pixel_width, res_width, counts_width):
+    layout = pixel_layout(max_pixel_per_cycle, pixel_width)
+
+    dut = DUT(layout, res_width, counts_width)
+    fragment = dut.get_fragment()
+
     def receive(frame, x0, y0, x1, y1, max_pixel_per_cycle, max_pixel_width):
 
         # prepare expected outputs
@@ -84,11 +89,6 @@ class TestROIPacker(unittest.TestCase):
         for ch in [4, 2, 1]:
             max_pixel_per_cycle = (word_width * ch) // min(supported_widths)
 
-            layout = pixel_layout(max_pixel_per_cycle, max(supported_widths))
-
-            dut = DUT(layout, res_width, counts_width)
-            fragment = dut.get_fragment()
-
             # The ROI is not affected by pixel_width, no need to test all supported width
             frame = get_frame(width, height, max(supported_widths), max_pixel_per_cycle)
 
@@ -98,8 +98,6 @@ class TestROIPacker(unittest.TestCase):
                     run,
                     [
                         (
-                            dut,
-                            fragment,
                             frame,
                             x0,
                             0,
@@ -107,6 +105,8 @@ class TestROIPacker(unittest.TestCase):
                             height,
                             max_pixel_per_cycle,
                             max(supported_widths),
+                            res_width,
+                            counts_width
                         )
                         for (x0, x1) in combinations(range(max_pixel_per_cycle * 2), 2)
                     ],
