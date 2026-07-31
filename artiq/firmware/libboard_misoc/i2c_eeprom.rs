@@ -18,7 +18,7 @@ impl EEPROM {
         }
     }
 
-    #[cfg(all(soc_platform = "kasli", any(hw_rev = "v2.0", hw_rev = "v2.1")))]
+    #[cfg(all(soc_platform = "kasli", any(hw_rev = "v2.0", hw_rev = "v2.1rc1", hw_rev = "v2.1")))]
     pub fn new() -> Self {
         EEPROM {
             busno: 0,

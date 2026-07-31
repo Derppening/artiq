@@ -22,10 +22,18 @@ pub struct IoExpander {
 }
 
 impl IoExpander {
-    #[cfg(all(soc_platform = "kasli", any(hw_rev = "v2.0", hw_rev = "v2.1")))]
+    #[cfg(all(soc_platform = "kasli", any(hw_rev = "v2.0", hw_rev = "v2.1rc1", hw_rev = "v2.1")))]
     pub fn new(index: u8) -> Result<Self, i2c::Error> {
+    
+        #[cfg(hw_rev = "v2.1rc1")]
         const VIRTUAL_LED_MAPPING0: [(u8, u8, u8); 2] = [(0, 0, 6), (1, 1, 6)];
+        #[cfg(hw_rev = "v2.1")]
+        const VIRTUAL_LED_MAPPING0: [(u8, u8, u8); 2] = [(0, 0, 7), (1, 1, 6)];
+
+        #[cfg(hw_rev = "v2.1rc1")]
         const VIRTUAL_LED_MAPPING1: [(u8, u8, u8); 2] = [(2, 0, 6), (3, 1, 6)];
+        #[cfg(hw_rev = "v2.1")]
+        const VIRTUAL_LED_MAPPING1: [(u8, u8, u8); 2] = [(2, 0, 6), (3, 1, 7)];
 
         #[cfg(has_si549)]
         const IODIR_CLK_SEL: u8 = 0x80; // out

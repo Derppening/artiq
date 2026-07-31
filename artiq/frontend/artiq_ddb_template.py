@@ -49,6 +49,7 @@ def get_num_leds(description):
         "v1.1": 6,
         "v2.0": 3,
         "v2.1": 3,
+        "v2.1rc1": 3,
     }
     if target == "kasli":
         if hw_rev in ("v1.0", "v1.1") and drtio_role != "standalone":
