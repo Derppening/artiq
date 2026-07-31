@@ -293,10 +293,8 @@
         paths = [pkgs.openocd bscan_spi_bitstreams-pkg];
       };
 
-    latex-artiq-manual = pkgs.texlive.combine {
-      inherit
-        (pkgs.texlive)
-        scheme-basic
+    latex-artiq-manual = pkgs.texliveSmall.withPackages (ps:
+      with ps; [
         latexmk
         cmap
         collection-fontsrecommended
@@ -316,8 +314,7 @@
         booktabs
         pgf
         pgfplots
-        ;
-    };
+    ]);
 
     artiq-frontend-dev-wrappers =
       pkgs.runCommand "artiq-frontend-dev-wrappers" {}
