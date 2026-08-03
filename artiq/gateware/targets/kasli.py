@@ -673,10 +673,7 @@ class GenericStandalone(StandaloneBase):
             with_wrpll=description["enable_wrpll"],
             **kwargs)
         self.config["RTIO_FREQUENCY"] = "{:.1f}".format(description["rtio_frequency"]/1e6)
-        if "ext_ref_frequency" in description:
-            self.config["SI5324_EXT_REF"] = None
-            self.config["EXT_REF_FREQUENCY"] = "{:.1f}".format(
-                description["ext_ref_frequency"]/1e6)
+        
         if hw_rev == "v1.0":
             # EEM clock fan-out from Si5324, not MMCX
             self.comb += self.platform.request("clk_sel").eq(1)
@@ -730,10 +727,7 @@ class GenericMaster(MasterBase):
             enable_sys5x=has_drtio_over_eem,
             with_wrpll=description["enable_wrpll"],
             **kwargs)
-        if "ext_ref_frequency" in description:
-            self.config["SI5324_EXT_REF"] = None
-            self.config["EXT_REF_FREQUENCY"] = "{:.1f}".format(
-                description["ext_ref_frequency"]/1e6)
+    
         if hw_rev == "v1.0":
             # EEM clock fan-out from Si5324, not MMCX
             self.comb += self.platform.request("clk_sel").eq(1)

@@ -150,6 +150,7 @@ class _StandaloneBase(MiniSoC, AMPSoC):
         self.config["I2C_BUS_COUNT"] = 1
 
         self.config["HAS_DDS"] = None
+        self.config["RTIO_FREQUENCY"] = str( "100.0" if drtio_100mhz else "125.0" )
 
     def add_rtio(self, rtio_channels):
         self.submodules.rtio_tsc = rtio.TSC(glbl_fine_ts_width=3)

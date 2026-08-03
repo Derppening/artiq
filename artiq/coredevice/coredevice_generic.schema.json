@@ -32,11 +32,6 @@
             "description": "Role that this device takes in a DRTIO network; 'standalone' means no DRTIO",
             "default": "standalone"
         },
-        "ext_ref_frequency": {
-            "type": "number",
-            "exclusiveMinimum": 0,
-            "description": "External reference frequency"
-        },
         "rtio_frequency": {
             "type": "number",
             "exclusiveMinimum": 0,

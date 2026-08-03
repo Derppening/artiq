@@ -8,7 +8,6 @@ use board_misoc::{csr, clock};
 #[derive(Debug, PartialEq, Copy, Clone)]
 #[allow(non_camel_case_types)]
 pub enum RtioClock {
-    Default,
     Int_125,
     Int_100,
     Ext0_Bypass,
@@ -19,7 +18,6 @@ pub enum RtioClock {
     Ext0_Synth0_125to125,
 }
 
-#[allow(unreachable_code)]
 fn get_rtio_clock_cfg() -> RtioClock {
     config::read_str("rtio_clock", |result| { 
         let res = match result {
@@ -33,37 +31,16 @@ fn get_rtio_clock_cfg() -> RtioClock {
             Ok("ext0_synth0_80to125") => RtioClock::Ext0_Synth0_80to125,
             Ok("ext0_synth0_100to125") => RtioClock::Ext0_Synth0_100to125,
             Ok("ext0_synth0_125to125") => RtioClock::Ext0_Synth0_125to125,
-            Ok("i") => {
-                warn!("Using legacy rtio_clock setting ('i'). Falling back to default. This will be deprecated.");
-                RtioClock::Default
-            },
-            Ok("e") => {
-                warn!("Using legacy rtio_clock setting ('e'). This will be deprecated.");
-                RtioClock::Ext0_Bypass
-            },
             _ => {
-                warn!("rtio_clock setting not recognised. Falling back to default.");
-                RtioClock::Default
+                warn!("rtio_clock setting not supported. Falling back to default");
+                #[cfg(rtio_frequency = "100.0")]
+                return RtioClock::Int_100;
+                #[cfg(rtio_frequency = "125.0")]
+                return RtioClock::Int_125;
+                #[cfg(not(any(rtio_frequency = "100.0", rtio_frequency = "125.0")))]
+                compile_error!("rtio_frequency setting not supported");
             }
         };
-        if res == RtioClock::Default {
-            #[cfg(any(si5324_ext_ref, ext_ref_frequency))]
-            warn!("si5324_ext_ref and ext_ref_frequency compile-time options are deprecated. Please use the rtio_clock coreconfig settings instead.");
-            #[cfg(all(rtio_frequency = "125.0", si5324_ext_ref, ext_ref_frequency = "10.0"))]
-            return RtioClock::Ext0_Synth0_10to125;
-            #[cfg(all(rtio_frequency = "125.0", si5324_ext_ref, ext_ref_frequency = "80.0"))]
-            return RtioClock::Ext0_Synth0_80to125;
-            #[cfg(all(rtio_frequency = "125.0", si5324_ext_ref, ext_ref_frequency = "100.0"))]
-            return RtioClock::Ext0_Synth0_100to125;
-            #[cfg(all(rtio_frequency = "125.0", si5324_ext_ref, ext_ref_frequency = "125.0"))]
-            return RtioClock::Ext0_Synth0_125to125;
-            #[cfg(all(rtio_frequency = "125.0", not(si5324_ext_ref)))]
-            return RtioClock::Int_125;
-            #[cfg(all(rtio_frequency = "100.0", not(si5324_ext_ref), not(soc_platform = "kasli")))]
-            return RtioClock::Int_100;
-            //in case nothing is set
-            return RtioClock::Int_125;
-        }
         res
      })
 
@@ -216,22 +193,7 @@ fn setup_si5324_pll(cfg: RtioClock) {
                 si5324::Input::Ckin2
             )
         },
-        _ => { // 125MHz output like above, default (if chosen option is not supported)
-            warn!("rtio_clock setting '{:?}' is not supported. Falling back to default internal 125MHz RTIO clock.", cfg);
-            (
-                si5324::FrequencySettings {
-                    n1_hs  : 10,
-                    nc1_ls : 4,
-                    n2_hs  : 10,
-                    n2_ls  : 19972,
-                    n31    : 4565,
-                    n32    : 4565,
-                    bwsel  : 4,
-                    crystal_as_ckin2: true
-                },
-                si5324::Input::Ckin2
-            )
-        }
+        RtioClock::Ext0_Bypass =>  unreachable!(),
     };
     si5324::setup(&si5324_settings, si5324_ref_input).expect("cannot initialize Si5324");
 }
