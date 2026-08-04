@@ -20,6 +20,11 @@ ARTIQ-10 (Unreleased)
 * Setting Zotino voltages in the dashboard moninj panel is now supported.
 * Parameter entries in the device database are now supported.
 
+Breaking changes:
+
+* `si5324_ext_ref` and `ext_ref_frequency` compile-time options have been removed. 
+* `i` and `e` values for the `rtio_clock` are no longer supported.
+
 ARTIQ-9
 -------
 
