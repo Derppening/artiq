@@ -189,8 +189,8 @@ def run(with_file=False):
     try:
         dataset_mgr = DatasetManager(dataset_db)
         device_mgr = DeviceManager(DeviceDB(args.device_db),
-                                  virtual_devices={"scheduler": DummyScheduler(),
-                                                   "ccb": DummyCCB()})
+                                   virtual_devices={"scheduler": DummyScheduler(),
+                                                    "ccb": DummyCCB()})
         try:
             exp_inst = _build_experiment(device_mgr, dataset_mgr, args)
             exp_inst.prepare()
