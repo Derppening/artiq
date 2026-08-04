@@ -70,11 +70,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1784994253,
-        "narHash": "sha256-J2Ve4BuQqFkGkm2n14l5dAHGlkhRx/T6v652fIQHHZw=",
+        "lastModified": 1785822376,
+        "narHash": "sha256-nJjKu4KJrFJR5D8yEv8VqcBC4bchLhKTj/kJmW1KCds=",
         "ref": "refs/heads/master",
-        "rev": "553f54e7f6b41e761b5a9ebb985505ca7429face",
-        "revCount": 2240,
+        "rev": "f89e70f5400e3d8fa0a1e51f77cb370df6caf0b9",
+        "revCount": 2277,
         "type": "git",
         "url": "https://git.m-labs.hk/M-Labs/nac3.git"
       },
@@ -107,12 +107,12 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1783776592,
-        "narHash": "sha256-UgCQzxeWI75XM8G+hPrPh+MKzEPjG3SpAj7dtqSbksA=",
-        "rev": "e7a3ca8092b61ff85b6a45bf863ea2b2d6a661b3",
-        "revCount": 1032869,
+        "lastModified": 1784497964,
+        "narHash": "sha256-vlHUuqAcbcH2RKmHbPiuQzbv1pnzzavXnI62RD0bqCU=",
+        "rev": "241313f4e8e508cb9b13278c2b0fa25b9ca27163",
+        "revCount": 1037713,
         "type": "tarball",
-        "url": "https://api.flakehub.com/f/pinned/DeterminateSystems/nixpkgs-weekly/0.1.1032869%2Brev-e7a3ca8092b61ff85b6a45bf863ea2b2d6a661b3/019f8355-02b4-7432-8b0c-3d57029bf5e6/source.tar.gz"
+        "url": "https://api.flakehub.com/f/pinned/DeterminateSystems/nixpkgs-weekly/0.1.1037713%2Brev-241313f4e8e508cb9b13278c2b0fa25b9ca27163/019fa760-2880-7491-9ad9-7ba4669f6a84/source.tar.gz"
       },
       "original": {
         "type": "tarball",
@@ -193,11 +193,11 @@
     "src-migen": {
       "flake": false,
       "locked": {
-        "lastModified": 1782587214,
-        "narHash": "sha256-g80vPVhMKjregKdDJPeP9MQ7MPSIvDeu+gTCEONUt7Y=",
+        "lastModified": 1785489033,
+        "narHash": "sha256-1FYVfYqqRH4HL1T+bgaioHrmOUwUcAzpMtQ32AFqNB8=",
         "ref": "refs/heads/master",
-        "rev": "70fc3b087637e67e5809d22c340d9b15384a3bc9",
-        "revCount": 2079,
+        "rev": "311773c163cc73c7214d37e94da5f34d578f2e05",
+        "revCount": 2080,
         "type": "git",
         "url": "https://git.m-labs.hk/M-Labs/migen.git"
       },
@@ -209,11 +209,11 @@
     "src-misoc": {
       "flake": false,
       "locked": {
-        "lastModified": 1781780111,
-        "narHash": "sha256-BoY4Dnh81JVYzDLZW2rN3CbMSibAULaPug0oDTWKk18=",
+        "lastModified": 1785488846,
+        "narHash": "sha256-GsCEUGRsPSb59H4EJkdTjZH3Mxw5qbRBNe9ukCHs2dg=",
         "ref": "refs/heads/master",
-        "rev": "a5d600e0315ef5820c988eac5a763e140dc497a1",
-        "revCount": 2527,
+        "rev": "b7db55e9fbb83b58f156c2a0e3051a7bc9a936e2",
+        "revCount": 2529,
         "submodules": true,
         "type": "git",
         "url": "https://git.m-labs.hk/M-Labs/misoc.git"
