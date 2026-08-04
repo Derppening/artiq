@@ -65,6 +65,11 @@ The ``host`` and ``port`` fields configure the TCP connection. The ``target`` fi
 
 An optional ``best_effort`` boolean field determines whether to use ``sipyco.pc_rpc.Client`` or ``sipyco.pc_rpc.BestEffortClient``. ``BestEffortClient`` is very similar to ``Client``, but suppresses network errors and automatically retries connections in the background. If no ``best_effort`` field is present, ``Client`` is used by default.
 
+Parameters
+^^^^^^^^^^
+
+Parameter entries have the ``type`` field set to ``parameter``. Requests return the raw value of the ``value`` field. This is useful for e.g. associating names with channel numbers of a multi-channel device such as Sinara Sampler.
+
 Aliases
 ^^^^^^^
 

@@ -56,6 +56,8 @@ def _create_device(desc, device_mgr, argument_overrides):
         else:
             cls = Client
         return cls(controller["host"], controller["port"], desc["target_name"])
+    elif ty == "parameter":
+        return desc["value"]
     elif ty == "dummy":
         return DummyDevice()
     else:
