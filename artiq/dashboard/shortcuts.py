@@ -61,6 +61,11 @@ class ShortcutsDock(QtWidgets.QDockWidget):
             layout.addWidget(submit, row, 4)
             submit.clicked.connect(partial(self._activated, i))
 
+            for w in (clear, open, submit):
+                policy = w.sizePolicy()
+                policy.setRetainSizeWhenHidden(True)
+                w.setSizePolicy(policy)
+
             clear.hide()
             open.hide()
             submit.hide()
