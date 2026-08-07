@@ -367,8 +367,8 @@ def main():
                         raise FileNotFoundError(f"no binary found for {region}")
                 programmer.write_binary(*config[region], path)
         elif cmd == "load":
-            gateware_bit = artifact_path(binary_dir, "gateware", "top.bit")
-            programmer.load(gateware_bit, 0)
+            gateware_bin = artifact_path(binary_dir, "gateware", "top.bin")
+            programmer.load(gateware_bin, 0)
         elif cmd == "start":
             programmer.start()
         elif cmd == "erase":
