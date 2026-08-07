@@ -203,13 +203,13 @@ def run(with_file=False):
             raise exn
         finally:
             device_mgr.close_devices()
-
-        if args.hdf5 is not None:
-            with h5py.File(args.hdf5, "w") as f:
-                dataset_mgr.write_hdf5(f)
-        else:
-            for k, v in sorted(dataset_mgr.local.items(), key=itemgetter(0)):
-                print("{}: {}".format(k, v))
+            if args.hdf5 is not None:
+                with h5py.File(args.hdf5, "w") as f:
+                    dataset_mgr.write_hdf5(f)
+        
+            else:
+                for k, v in sorted(dataset_mgr.local.items(), key=itemgetter(0)):
+                    print("{}: {}".format(k, v))
     finally:
         dataset_db.save()
         dataset_db.close_db()
