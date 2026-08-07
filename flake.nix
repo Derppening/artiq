@@ -268,7 +268,7 @@
           '';
           installPhase = ''
             mkdir $out
-            cp artiq_${target}/${variant}/gateware/top.bit $out
+            cp artiq_${target}/${variant}/gateware/top.bin $out
             if [ -e artiq_${target}/${variant}/software/bootloader/bootloader.bin ]
             then cp artiq_${target}/${variant}/software/bootloader/bootloader.bin $out
             fi
