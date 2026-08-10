@@ -95,6 +95,7 @@ class _StandaloneBase(MiniSoC, AMPSoC):
                          ethmac_nrxslots=4,
                          ethmac_ntxslots=4,
                          rtio_sys_merge=True,
+                         gateware_bin_file=True,
                          **kwargs)
         AMPSoC.__init__(self)
         add_identifier(self, gateware_identifier_str=gateware_identifier_str)
@@ -196,6 +197,7 @@ class _MasterBase(MiniSoC, AMPSoC):
                          ethmac_ntxslots=4,
                          clk_freq=clk_freq,
                          rtio_sys_merge=True,
+                         gateware_bin_file=True,
                          **kwargs)
         AMPSoC.__init__(self)
         add_identifier(self, gateware_identifier_str=gateware_identifier_str)
@@ -343,6 +345,7 @@ class _SatelliteBase(BaseSoC, AMPSoC):
                  integrated_sram_size=8192,
                  clk_freq=clk_freq,
                  rtio_sys_merge=True,
+                 gateware_bin_file=True,
                  **kwargs)
         AMPSoC.__init__(self)
         add_identifier(self, gateware_identifier_str=gateware_identifier_str)

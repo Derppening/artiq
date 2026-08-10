@@ -75,6 +75,7 @@ class StandaloneBase(MiniSoC, AMPSoC):
                          ethmac_ntxslots=4,
                          clk_freq=kwargs.get("rtio_frequency", 125.0e6),
                          rtio_sys_merge=True,
+                         gateware_bin_file=True,
                          **kwargs)
         AMPSoC.__init__(self)
         add_identifier(self, gateware_identifier_str=gateware_identifier_str)
@@ -184,6 +185,7 @@ class MasterBase(MiniSoC, AMPSoC):
                          ethmac_ntxslots=4,
                          clk_freq=rtio_clk_freq,
                          rtio_sys_merge=True,
+                         gateware_bin_file=True,
                          **kwargs)
         AMPSoC.__init__(self)
         add_identifier(self, gateware_identifier_str=gateware_identifier_str)
@@ -433,6 +435,7 @@ class SatelliteBase(BaseSoC, AMPSoC):
                  l2_line_size=64,
                  clk_freq=rtio_clk_freq,
                  rtio_sys_merge=True,
+                 gateware_bin_file=True,
                  **kwargs)
         AMPSoC.__init__(self)
         add_identifier(self, gateware_identifier_str=gateware_identifier_str)

@@ -155,6 +155,7 @@ class _SatelliteBase(BaseSoC, AMPSoC):
                  l2_size=128*1024,
                  l2_line_size=64,
                  clk_freq=rtio_clk_freq,
+                 gateware_bin_file=True,
                  **kwargs)
         AMPSoC.__init__(self)
         add_identifier(self, gateware_identifier_str=gateware_identifier_str)
