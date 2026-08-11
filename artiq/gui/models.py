@@ -118,25 +118,12 @@ class DictSyncModel(QtCore.QAbstractTableModel):
 
     def __setitem__(self, k, v):
         if k in self.backing_store:
-            old_row = self.row_to_key.index(k)
-            new_row = self._find_row(k, v)
-            if old_row == new_row:
-                self.dataChanged.emit(self.index(old_row, 0),
-                                      self.index(old_row, len(self.headers)-1))
-            else:
-                self.beginMoveRows(QtCore.QModelIndex(), old_row, old_row,
-                                   QtCore.QModelIndex(), new_row)
-            self.backing_store[k] = v
-            self.row_to_key[old_row], self.row_to_key[new_row] = \
-                self.row_to_key[new_row], self.row_to_key[old_row]
-            if old_row != new_row:
-                self.endMoveRows()
-        else:
-            row = self._find_row(k, v)
-            self.beginInsertRows(QtCore.QModelIndex(), row, row)
-            self.backing_store[k] = v
-            self.row_to_key.insert(row, k)
-            self.endInsertRows()
+            del self[k]
+        row = self._find_row(k, v)
+        self.beginInsertRows(QtCore.QModelIndex(), row, row)
+        self.backing_store[k] = v
+        self.row_to_key.insert(row, k)
+        self.endInsertRows()
 
     def __delitem__(self, k):
         row = self.row_to_key.index(k)
