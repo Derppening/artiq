@@ -62,7 +62,19 @@
     };
     pkgs = import nac3.inputs.nixpkgs {
       system = "x86_64-linux";
-      overlays = [(import rust-overlay-patched)];
+      overlays = [(import rust-overlay-patched)
+       (
+        final: prev: {
+          python3 = prev.python3.override {
+            packageOverrides = pyFinal: pyPrev: {
+              qasync = pyPrev.qasync.overridePythonAttrs (old: {
+                patches = (old.patches or []) ++ [ ./fix-qasync.patch];
+              });
+            };
+          };
+          python3Packages = final.python3.pkgs;
+        }
+      )];
     };
     pkgs-aarch64 = import nac3.inputs.nixpkgs {system = "aarch64-linux";};
 
