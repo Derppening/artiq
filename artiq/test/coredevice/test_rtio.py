@@ -159,7 +159,7 @@ class ClockGeneratorLoopback(EnvExperiment):
         self.core.reset()
         self.loop_clock_in.input()
         self.loop_clock_out.stop()
-        self.core.delay(200.*us)
+        self.core.delay(20.*us)
         with parallel:
             self.loop_clock_in.gate_rising(10.*us)
             with sequential:
