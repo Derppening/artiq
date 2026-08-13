@@ -5,7 +5,6 @@ from artiq.language.units import us
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.mirny import Mirny
-from artiq.coredevice.spi2 import *
 
 
 # almazny-specific data

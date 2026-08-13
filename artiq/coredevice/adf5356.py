@@ -16,19 +16,19 @@ from artiq.language.units import us, GHz, MHz
 from artiq.coredevice.core import Core
 from artiq.coredevice.mirny import Mirny
 from artiq.coredevice.ttl import TTLOut
-from artiq.coredevice.spi2 import *
+from artiq.coredevice import spi2 as spi
 from artiq.coredevice.adf5356_reg import *
 
 
 SPI_CONFIG = (
-    0 * SPI_OFFLINE
-    | 0 * SPI_END
-    | 0 * SPI_INPUT
-    | 1 * SPI_CS_POLARITY
-    | 0 * SPI_CLK_POLARITY
-    | 0 * SPI_CLK_PHASE
-    | 0 * SPI_LSB_FIRST
-    | 0 * SPI_HALF_DUPLEX
+    0 * spi.SPI_OFFLINE
+    | 0 * spi.SPI_END
+    | 0 * spi.SPI_INPUT
+    | 1 * spi.SPI_CS_POLARITY
+    | 0 * spi.SPI_CLK_POLARITY
+    | 0 * spi.SPI_CLK_PHASE
+    | 0 * spi.SPI_LSB_FIRST
+    | 0 * spi.SPI_HALF_DUPLEX
 )
 
 
