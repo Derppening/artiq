@@ -5,6 +5,7 @@ import numpy as np
 from numpy import int32, int64, uint32, uint64, float64, bool_, str_, ndarray
 from types import GenericAlias, ModuleType, SimpleNamespace
 from typing import _GenericAlias, Generic, Literal, TypeVar
+from enum import EnumType, IntEnum
 
 from artiq.language.core import *
 from artiq.language.core import _ConstGenericMarker
@@ -89,6 +90,11 @@ class Core:
             "abs": abs,
             "some": Some,
             "staticmethod": staticmethod,
+
+            "enum": {
+                "IntEnum": IntEnum,
+                "EnumType": EnumType,
+            },
 
             "types": {
                 "GenericAlias": GenericAlias,
