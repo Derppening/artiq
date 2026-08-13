@@ -5,8 +5,8 @@ from artiq.language.units import ms, us, ns
 from artiq.coredevice.ad9912_reg import *
 
 from artiq.coredevice.core import Core
-from artiq.coredevice.spi2 import *
-from artiq.coredevice.urukul import *
+from artiq.coredevice import spi2 as spi
+from artiq.coredevice import urukul
 from artiq.coredevice.ttl import TTLOut
 
 
@@ -28,14 +28,14 @@ class AD9912:
     """
 
     core: KernelInvariant[Core]
-    cpld: KernelInvariant[CPLD[Auto]]
-    bus: KernelInvariant[SPIMaster]
+    cpld: KernelInvariant[urukul.CPLD[Auto]]
+    bus: KernelInvariant[spi.SPIMaster]
     chip_select: KernelInvariant[int32]
     pll_n: KernelInvariant[int32]
     pll_en: KernelInvariant[bool]
     ftw_per_hz: KernelInvariant[float]
     sw: KernelInvariant[Option[TTLOut]]
-    io_update: KernelInvariant[IOUpdate]
+    io_update: KernelInvariant[urukul.IOUpdate]
 
     def __init__(self, dmgr, chip_select, cpld_device, sw_device=None,
                  pll_en=True):
@@ -68,7 +68,7 @@ class AD9912:
         assert sysclk <= 1e9
         self.ftw_per_hz = 1 / sysclk * (1 << 48)
 
-        self.io_update = IOUpdate(self.cpld, self.chip_select)
+        self.io_update = urukul.IOUpdate(self.cpld, self.chip_select)
 
     @kernel
     def write(self, addr: int32, data: int32, length: int32):
@@ -81,11 +81,11 @@ class AD9912:
         """
         assert length > 0
         assert length <= 4
-        self.bus.set_config_mu(SPI_CONFIG, 16,
-                               SPIT_DDS_WR, self.chip_select)
+        self.bus.set_config_mu(urukul.SPI_CONFIG, 16,
+                               urukul.SPIT_DDS_WR, self.chip_select)
         self.bus.write((addr | ((length - 1) << 13)) << 16)
-        self.bus.set_config_mu(SPI_CONFIG | SPI_END, length * 8,
-                               SPIT_DDS_WR, self.chip_select)
+        self.bus.set_config_mu(urukul.SPI_CONFIG | spi.SPI_END, length * 8,
+                               urukul.SPIT_DDS_WR, self.chip_select)
         self.bus.write(data << (32 - length * 8))
 
     @kernel
@@ -99,12 +99,12 @@ class AD9912:
         """
         assert length > 0
         assert length <= 4
-        self.bus.set_config_mu(SPI_CONFIG, 16,
-                               SPIT_DDS_WR, self.chip_select)
+        self.bus.set_config_mu(urukul.SPI_CONFIG, 16,
+                               urukul.SPIT_DDS_WR, self.chip_select)
         self.bus.write((addr | ((length - 1) << 13) | 0x8000) << 16)
-        self.bus.set_config_mu(SPI_CONFIG | SPI_END
-                               | SPI_INPUT, length * 8,
-                               SPIT_DDS_RD, self.chip_select)
+        self.bus.set_config_mu(urukul.SPI_CONFIG | spi.SPI_END
+                               | spi.SPI_INPUT, length * 8,
+                               urukul.SPIT_DDS_RD, self.chip_select)
         self.bus.write(0)
         data = self.bus.read()
         if length < 4:
@@ -198,14 +198,14 @@ class AD9912:
         :param pow_: Phase tuning word: 16-bit unsigned.
         """
         # streaming transfer of FTW and POW
-        self.bus.set_config_mu(SPI_CONFIG, 16,
-                               SPIT_DDS_WR, self.chip_select)
+        self.bus.set_config_mu(urukul.SPI_CONFIG, 16,
+                               urukul.SPIT_DDS_WR, self.chip_select)
         self.bus.write((AD9912_POW1 << 16) | (3 << 29))
-        self.bus.set_config_mu(SPI_CONFIG, 32,
-                               SPIT_DDS_WR, self.chip_select)
+        self.bus.set_config_mu(urukul.SPI_CONFIG, 32,
+                               urukul.SPIT_DDS_WR, self.chip_select)
         self.bus.write((pow_ << 16) | (int32(ftw >> 32) & 0xffff))
-        self.bus.set_config_mu(SPI_CONFIG | SPI_END, 32,
-                               SPIT_DDS_WR, self.chip_select)
+        self.bus.set_config_mu(urukul.SPI_CONFIG | spi.SPI_END, 32,
+                               urukul.SPIT_DDS_WR, self.chip_select)
         self.bus.write(int32(ftw))
         self.io_update.pulse(10. * ns)
 
