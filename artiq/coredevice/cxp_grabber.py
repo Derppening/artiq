@@ -1,10 +1,11 @@
+from typing import Literal
+
 from numpy import array, int32, int64, ndarray
 
 from artiq.language.core import extern, kernel
 from artiq.coredevice.rtio import rtio_output, rtio_input_timestamped_data
 from artiq.coredevice.core import Core
 from artiq.experiment import *
-from typing import Literal
 
 
 @compile
