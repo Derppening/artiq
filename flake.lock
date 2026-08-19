@@ -70,11 +70,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1786006382,
-        "narHash": "sha256-aqRMt52ch9nD36vUGekTd4QSzm8e280FFhnih0vHjM4=",
+        "lastModified": 1787144799,
+        "narHash": "sha256-BwJvzQyZ1Wi5Ea1FX0PQYBccki3QP7/Ei8wDDFtOJ+Y=",
         "ref": "refs/heads/master",
-        "rev": "fb558aa454902220b1e31dd39698b76600354380",
-        "revCount": 2288,
+        "rev": "186b7ce7234bd0162042e2172d43ea20d83b27fa",
+        "revCount": 2303,
         "type": "git",
         "url": "https://git.m-labs.hk/M-Labs/nac3.git"
       },
@@ -107,12 +107,12 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1784497964,
-        "narHash": "sha256-vlHUuqAcbcH2RKmHbPiuQzbv1pnzzavXnI62RD0bqCU=",
-        "rev": "241313f4e8e508cb9b13278c2b0fa25b9ca27163",
-        "revCount": 1037713,
+        "lastModified": 1786247143,
+        "narHash": "sha256-8S3Kcxs7D4UtxJxSJZz0m14CGhuW0MxfrIwJxeGWGnQ=",
+        "rev": "279b4a8275f032c566576b3f181fa0f27197f588",
+        "revCount": 1050399,
         "type": "tarball",
-        "url": "https://api.flakehub.com/f/pinned/DeterminateSystems/nixpkgs-weekly/0.1.1037713%2Brev-241313f4e8e508cb9b13278c2b0fa25b9ca27163/019fa760-2880-7491-9ad9-7ba4669f6a84/source.tar.gz"
+        "url": "https://api.flakehub.com/f/pinned/DeterminateSystems/nixpkgs-weekly/0.1.1050399%2Brev-279b4a8275f032c566576b3f181fa0f27197f588/01a01364-0c36-7a91-b20d-31b3a834ddeb/source.tar.gz"
       },
       "original": {
         "type": "tarball",
@@ -177,11 +177,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1784687718,
-        "narHash": "sha256-M04PsE0uJegYuhN9DNDnhihcUVD8vOzFSHYcEUi3548=",
+        "lastModified": 1787027031,
+        "narHash": "sha256-VaQjTTW/OjiNgAiaY8A5hrZpaHHMredMzKTBc1LgLtA=",
         "ref": "refs/heads/master",
-        "rev": "986ef9bb147d32069fa0601cc518cf7b2b1d0072",
-        "revCount": 167,
+        "rev": "55f112927d74c41f886d81d64e2301fad758e37e",
+        "revCount": 170,
         "type": "git",
         "url": "https://git.m-labs.hk/M-Labs/sipyco.git"
       },
@@ -193,11 +193,11 @@
     "src-migen": {
       "flake": false,
       "locked": {
-        "lastModified": 1785489033,
-        "narHash": "sha256-1FYVfYqqRH4HL1T+bgaioHrmOUwUcAzpMtQ32AFqNB8=",
+        "lastModified": 1786526909,
+        "narHash": "sha256-HSzS8zJJOgLGsg6dVnKy/62HscJOu5rFSiAgQ27oz9s=",
         "ref": "refs/heads/master",
-        "rev": "311773c163cc73c7214d37e94da5f34d578f2e05",
-        "revCount": 2080,
+        "rev": "3dcfedd0b9e533e073228bb3eb0f973d22074919",
+        "revCount": 2082,
         "type": "git",
         "url": "https://git.m-labs.hk/M-Labs/migen.git"
       },
