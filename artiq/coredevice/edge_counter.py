@@ -32,7 +32,7 @@ risking input RTIO overflows: ::
         self.pmt_0.gate_rising(10 * ms)
         self.pmt_1.gate_rising(10 * ms)
 
-    counts_0 = self.pmt_0.count(now_mu()) # blocks
+    counts_0 = self.pmt_0.count(now_mu()) # blocks, meanwhile pmt_1 FIFO fills up and may overflow
     counts_1 = self.pmt_1.count(now_mu())
 
     # Using gateware counters, only a single input event each is
