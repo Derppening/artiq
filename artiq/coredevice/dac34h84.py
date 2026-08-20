@@ -1,9 +1,9 @@
 from numpy import int32, int64
 
+from artiq.coredevice.core import Core
 from artiq.coredevice import spi2 as spi
 from artiq.coredevice.dac34h84_reg import DAC34H84 as DAC34H84Reg
 from artiq.language.core import *
-from artiq.language.types import *
 from artiq.language.units import us, GHz
 
 
@@ -23,6 +23,7 @@ DAC_SPI_CONFIG = (
 )
 
 
+@compile
 class DAC34H84:
     """DAC DAC34H84 driver
 
@@ -30,8 +31,11 @@ class DAC34H84:
     :param input_sample_rate: DAC input sample rate
     :param core_device: Core device name (default: "core").
     """
-
-    kernel_invariants = {"core", "bus", "f_dac", "input_sample_rate", "init_mmap"}
+    core: KernelInvariant[Core]
+    bus: KernelInvariant[spi.SPIMaster]
+    f_dac: KernelInvariant[float]
+    input_sample_rate: KernelInvariant[float]
+    init_mmap: KernelInvariant[list[int32]]
 
     def __init__(
         self,
@@ -86,16 +90,16 @@ class DAC34H84:
         self.write(0x02, 0x0080)
         if self.read(0x7F) != 0x5409:
             raise ValueError("DAC34H84 version mismatch")
-        delay(40.0 * us)
+        self.core.delay(40.0 * us)
         if self.read(0x00) != 0x049C:
             raise ValueError("DAC34H84 reset fail")
-        delay(40.0 * us)
+        self.core.delay(40.0 * us)
 
         for data in self.init_mmap:
             self.write(data >> 16, data & 0xFFFF)
 
         reg_0x18 = self.read(0x18)
-        delay(40.0 * us)
+        self.core.delay(40.0 * us)
         # Use PLL loop filter voltage to check lock status - Table 10, Step 34 SLAS751D section 7.5.2.4
         if not (0x2 <= reg_0x18 & 0b111 <= 0x5):
             raise ValueError("DAC34H84 PLL fail to lock")
@@ -106,7 +110,7 @@ class DAC34H84:
         self.tune_fifo_offset()
 
     @kernel
-    def read(self, addr, div=DAC_SPI_DIV) -> TInt32:
+    def read(self, addr: int32, div: int32 = DAC_SPI_DIV) -> int32:
         self.bus.set_config_mu(
             DAC_SPI_CONFIG | spi.SPI_INPUT,
             24,
@@ -117,7 +121,7 @@ class DAC34H84:
         return self.bus.read()
 
     @kernel
-    def write(self, addr, value, div=DAC_SPI_DIV):
+    def write(self, addr: int32, value: int32, div: int32 = DAC_SPI_DIV):
         self.bus.set_config_mu(
             DAC_SPI_CONFIG,
             24,
@@ -127,7 +131,7 @@ class DAC34H84:
         self.bus.write(addr << 24 | value << 8)
 
     @kernel
-    def read_temperature(self) -> TInt32:
+    def read_temperature(self) -> int32:
         """Return the current DAC temperature in Celsius.
 
         This method consumes all slack.
@@ -138,7 +142,7 @@ class DAC34H84:
     def tune_fifo_offset(self):
         """Find and set an optimal FIFO offset with maximum safety margin."""
         reg_0x09 = self.read(0x09)
-        delay(40.0 * us)
+        self.core.delay(40.0 * us)
 
         DAC_FIFO_DEPTH = 8
         good = 0
@@ -147,12 +151,12 @@ class DAC34H84:
 
             # clear alarm and let it run for a while
             self.write(0x05, 0x0000)
-            delay(100.0 * us)
+            self.core.delay(100.0 * us)
 
             # check FIFO pointer collision alarm
             if (self.read(0x05) >> 11) & 0b111 == 0:
                 good |= 1 << offset
-            delay(40.0 * us)
+            self.core.delay(40.0 * us)
 
         # If good offset is at both ends, shift the samples for easy mean calculation
         if good & 0x81 == 0x81:
@@ -165,7 +169,7 @@ class DAC34H84:
         sum = 0
         count = 0
         for offset in range(DAC_FIFO_DEPTH):
-            if good & (1 << offset):
+            if bool(good & (1 << offset)):
                 sum += offset
                 count += 1
         if count == 0:
@@ -176,14 +180,14 @@ class DAC34H84:
         self.write(0x05, 0x0000)
 
     @kernel
-    def enable_mixer(self, enable):
+    def enable_mixer(self, enable: bool):
         """Enable DAC internal mixer block and NCO mixer.
 
         :param enable: Enable internal mixer block and NCO mixer when set to True
         """
         reg = self.read(0x02)
-        delay(40.0 * us)
-        if en:
+        self.core.delay(40.0 * us)
+        if enable:
             self.write(0x02, reg | 1 << 6 | 1 << 4)
         else:
             self.write(0x02, reg & ~(1 << 4) & ~(1 << 6))
@@ -201,12 +205,12 @@ class DAC34H84:
         .. note:: Synchronising the NCO clears the phase-accumulator.
         """
         reg = self.read(0x1F)
-        delay(40.0 * us)
+        self.core.delay(40.0 * us)
         self.write(0x1F, reg & ~0x2)
         self.write(0x1F, reg | 0x2)
 
     @kernel
-    def stage_nco_mixer_frequency_mu(self, channel, ftw):
+    def stage_nco_mixer_frequency_mu(self, channel: int32, ftw: int32):
         """Stage the DAC NCO mixer frequency in machine units.
 
         Before using NCO mixer, the mixer must be enabled via :meth:`enable_mixer`.
@@ -227,7 +231,7 @@ class DAC34H84:
             raise ValueError("Invalid channel number")
 
     @kernel
-    def stage_nco_mixer_phase_offset_mu(self, channel, pow):
+    def stage_nco_mixer_phase_offset_mu(self, channel: int32, pow: int32):
         """Stage the DAC NCO mixer phase offset in machine units.
 
         Before using NCO mixer, the mixer must be enabled via :meth:`enable_mixer`.
@@ -245,24 +249,24 @@ class DAC34H84:
         else:
             raise ValueError("Invalid channel number")
 
-    @portable(flags={"fast-math"})
-    def frequency_to_ftw(self, frequency) -> TInt32:
+    @portable
+    def frequency_to_ftw(self, frequency: float) -> int32:
         """Return the 32-bit frequency tuning word corresponding to the given frequency in Hz.
 
         :param frequency: Frequency in Hz
         """
-        return int32(round((int64(1) << 32) * (frequency / (self.f_dac))))
+        return round(float(int64(1) << 32) * (frequency / (self.f_dac)))
 
-    @portable(flags={"fast-math"})
-    def turns_to_pow(self, turns) -> TInt32:
+    @portable
+    def turns_to_pow(self, turns: float) -> int32:
         """Return the 16-bit phase offset word corresponding to the given phase in turns.
 
         :param turns: Phase offset in turns (0.0 to 1.0)
         """
-        return int32(round(turns * (1 << 16)))
+        return round(turns * float(1 << 16))
 
     @kernel
-    def stage_nco_mixer_frequency(self, channel, frequency):
+    def stage_nco_mixer_frequency(self, channel: int32, frequency: float):
         """Stage the DAC NCO mixer frequency in SI units.
 
         Before using NCO mixer, the mixer must be enabled via :meth:`enable_mixer`.
@@ -276,7 +280,7 @@ class DAC34H84:
         self.stage_nco_mixer_frequency_mu(channel, self.frequency_to_ftw(frequency))
 
     @kernel
-    def stage_nco_mixer_phase_offset(self, channel, phase):
+    def stage_nco_mixer_phase_offset(self, channel: int32, phase: float):
         """Stage the DAC NCO mixer phase offset in SI units.
 
         Before using NCO mixer, the mixer must be enabled via :meth:`enable_mixer`.
