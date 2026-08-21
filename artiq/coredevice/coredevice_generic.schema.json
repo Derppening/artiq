@@ -724,7 +724,7 @@
                             "type": "integer"
                         }
                     },
-                    "required": ["ports"]
+                    "required": ["gateware_variant", "hardware_variant", "ports"]
                     }
                 },  {
                 "title": "HVAmp",
