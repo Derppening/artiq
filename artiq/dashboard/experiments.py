@@ -307,11 +307,14 @@ class _ExperimentDock(QtWidgets.QMdiSubWindow):
             return
         arginfo = expdesc["arginfo"]
         for k, v in overrides.items():
-            # Some values (e.g. scans) may have multiple defaults in a list
-            if ("default" in arginfo[k][0] and isinstance(arginfo[k][0]["default"], list)):
-                arginfo[k][0]["default"].insert(0, v)
+            if k in arginfo:
+                # Some values (e.g. scans) may have multiple defaults in a list
+                if ("default" in arginfo[k][0] and isinstance(arginfo[k][0]["default"], list)):
+                    arginfo[k][0]["default"].insert(0, v)
+                else:
+                    arginfo[k][0]["default"] = v
             else:
-                arginfo[k][0]["default"] = v
+                logger.warning("Argument %s is present in HDF5 file but not in current experiment", k)
         self.manager.initialize_submission_arguments(self.expurl, arginfo, ui_name)
 
         argeditor_state = self.argeditor.save_state()
