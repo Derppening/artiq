@@ -24,6 +24,7 @@ __all__ = [
     "parallel", "legacy_parallel", "sequential",
     "delay_mu", "now_mu", "at_mu",
     "set_watchdog_factory", "watchdog", "TerminationRequested",
+    "rtio_log", "core_log"
 ]
 
 
@@ -127,6 +128,14 @@ def rpc(arg=None, flags={}):
 @rpc(flags={"async"})
 def print_rpc(a: T):
     print(a)
+
+
+def core_log(a: T):
+    pass
+
+
+def rtio_log(channel: str, arg: T):
+    pass
 
 
 @compile

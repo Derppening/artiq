@@ -215,6 +215,10 @@ class Core:
                 "kernel": kernel,
                 "portable": portable,
                 "rpc": rpc,
+
+                # Logging
+                "rtio_log": rtio_log,
+                "core_log": core_log,
             },
         }
 
