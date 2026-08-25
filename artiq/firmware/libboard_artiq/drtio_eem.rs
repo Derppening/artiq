@@ -1,20 +1,40 @@
-use board_misoc::{csr, clock, config};
 #[cfg(feature = "alloc")]
-use alloc::format;
-
+use alloc::{
+    fmt::{Display, Formatter, Result as FmtResult},
+    format,
+    str::FromStr,
+    string::{String, ToString},
+    vec::Vec,
+};
+use board_misoc::{clock, config, csr};
+use core::convert::TryInto;
 
 struct SerdesConfig {
     pub delay: [u8; 4],
 }
 
-impl SerdesConfig {
-    pub fn as_bytes(&self) -> &[u8] {
-        unsafe {
-            core::slice::from_raw_parts(
-                (self as *const SerdesConfig) as *const u8,
-                core::mem::size_of::<SerdesConfig>(),
-            )
-        }
+impl Display for SerdesConfig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "{:?}", self.delay)
+    }
+}
+
+impl FromStr for SerdesConfig {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let delay: [u8; 4] = s
+            .strip_prefix('[')
+            .and_then(|s| s.strip_suffix(']'))
+            .ok_or("failed to parse delimiters")?
+            .splitn(4, ',')
+            .map(|s| s.trim_start().parse::<u8>())
+            .collect::<Result<Vec<u8>, _>>()
+            .map_err(|e| format!("failed to parse recorded delays: {:?}", e))?
+            .try_into()
+            .map_err(|e| format!("failed to convert vec into array: {:?}", e))?;
+
+        Ok(Self { delay })
     }
 }
 
@@ -216,15 +236,20 @@ pub fn init() {
             match r {
                 Ok(record) => {
                     info!("loading calibrated timing values from flash");
-                    unsafe {
-                        apply_config(&*(record.as_ptr() as *const SerdesConfig));
-                    }
-                },
+                    let record_str = core::str::from_utf8(record.into()).unwrap();
+                    match SerdesConfig::from_str(record_str) {
+                        Ok(config) => apply_config(&config),
+                        Err(e) => panic!(
+                            "failed to parse calibration record {:?} ({:?})",
+                            record_str, e
+                        ),
+                    };
+                }
 
                 Err(_) => {
                     info!("calibrating...");
                     let config = unsafe { assign_delay() };
-                    config::write(&key, config.as_bytes()).unwrap();
+                    config::write(&key, config.to_string().as_bytes()).unwrap();
                 }
             }
         });
