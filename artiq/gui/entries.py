@@ -354,6 +354,79 @@ class NumberEntryFloat(ScientificSpinBox):
             return 0.0
 
 
+class TableDelegate(QtWidgets.QStyledItemDelegate):
+    def __init__(self, argument):
+        super().__init__()
+        self.argument = argument
+
+    def initStyleOption(self, option, index):
+        super().initStyleOption(option, index)
+        if self.argument["desc"]["unit"]:
+            unit = self.argument["desc"]["unit"][index.row()][index.column()]
+            option.text = f'{option.text} {unit}'
+
+    def createEditor(self, parent, option, index):
+        row = index.row()
+        column = index.column()
+        procdesc = self.argument["desc"]
+        scale = procdesc["scale"][row][column]
+        precision = procdesc["precision"][row][column]
+        step = procdesc["step"][row][column]
+        unit = procdesc["unit"][row][column]
+        mn = procdesc["min"]
+        mx = procdesc["max"]
+        
+        editor = ScientificSpinBox(parent)
+        disable_scroll_wheel(editor)
+        editor.setDecimals(precision)
+        editor.setSigFigs()
+        editor.setSingleStep(step/scale)
+        editor.setRelativeStep()
+        editor.setMinimum(mn[row][column]/scale if mn is not None else float("-inf"))
+        editor.setMaximum(mx[row][column]/scale if mx is not None else float("inf"))
+        if unit:
+            editor.setSuffix(" " + unit)
+        return editor
+        
+
+class TableEntry(QtWidgets.QTableWidget):
+    def __init__(self, argument):
+        super().__init__()
+        self.setItemDelegate(TableDelegate(argument))
+        self.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.AllEditTriggers)
+        procdesc = argument["desc"]
+        rows = procdesc["rows"]
+        columns = procdesc["columns"]
+        row_headers = procdesc["row_headers"]
+        column_headers = procdesc["column_headers"]
+        scale = argument["desc"]["scale"]
+        self.setRowCount(rows)
+        self.setColumnCount(columns)
+        self.setVerticalHeaderLabels(row_headers)
+        self.setHorizontalHeaderLabels(column_headers)
+        for row in range(rows):
+            for column in range(columns):
+                item = QtWidgets.QTableWidgetItem()
+                state = argument["state"][row][column]
+                item.setData(QtCore.Qt.ItemDataRole.DisplayRole, float(state/scale[row][column]))
+                self.setItem(row, column, item)
+        def update(row, column):
+            item = self.item(row, column)
+            argument["state"][row][column] = float(item.text()) * scale[row][column]
+        self.cellChanged.connect(update)
+
+    @staticmethod
+    def state_to_value(state):
+        return state
+
+    @staticmethod
+    def default_state(procdesc):
+        if "default" in procdesc:
+            return procdesc["default"]
+        else:
+            return [[0 for item in range(procdesc["columns"])] for row in range(procdesc["rows"])]
+
+
 class _NoScan(LayoutWidget):
     def __init__(self, procdesc, state):
         LayoutWidget.__init__(self)
@@ -681,8 +754,9 @@ def procdesc_to_entry(procdesc):
     else:
         return {
             "PYONValue": StringEntry,
+            "StringValue": StringEntry,
             "BooleanValue": BooleanEntry,
             "EnumerationValue": EnumerationEntry,
-            "StringValue": StringEntry,
+            "TableValue" : TableEntry,
             "Scannable": ScanEntry
         }[ty]
