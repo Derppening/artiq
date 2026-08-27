@@ -12,7 +12,7 @@ from artiq import compat
 
 __all__ = ["NoDefault", "DefaultMissing",
            "PYONValue", "BooleanValue", "EnumerationValue",
-           "NumberValue", "StringValue",
+           "NumberValue", "StringValue", "TableValue",
            "HasEnvironment", "Experiment", "EnvExperiment",
            "CancelledArgsError"]
 
@@ -216,6 +216,119 @@ class NumberValue(_SimpleArgProcessor):
 class StringValue(_SimpleArgProcessor):
     """A string argument."""
     pass
+
+
+class TableValue(_SimpleArgProcessor):
+    """A table argument.
+
+    When ``scale`` is not specified, and the unit is a common one (i.e.
+    defined in :class:`~artiq.language.units`), then the scale is obtained from
+    the unit using a simple string match. For example, milliseconds (``"ms"``)
+    units set the scale to 0.001. No unit (default) corresponds to a scale of
+    1.0.
+
+    For arguments with uncommon or complex units, use both the unit parameter 
+    and the scale parameter.
+
+    :param rows: The number of rows the table will have.
+    :param columns: The number of columns the table will have.
+    :param row_headers: A list of strings to be used as the table's row headers.
+    :param column_headers: A list of strings to be used as the table's column headers.
+    :param default: A 2D numeric nested list or NumPy array. The default value of the table.
+    :param unit: A 2D string nested list. Represents the unit of each table cell's value.
+    :param scale: A 2D numeric nested list or NumPy array. Represents the scaling factor by which the table cell's value is multiplied when referenced in the experiment.
+    :param step: A 2D numeric nested list or NumPy array. The step with which the table cell's value should be modified by up/down
+        buttons in a UI. The default is the table cell's scale divided by 10.
+    :param min: A 2D numeric nested list or NumPy array. The minimum value of the table cell's argument.
+    :param max: A 2D numeric nested list or NumPy array. The maximum value of the table cell's argument.
+    :param precision: A 2D numeric nested list or NumPy array. The maximum number of decimals a table cell should use.
+    """
+    def __init__(self, rows, columns, row_headers, column_headers, default=NoDefault,  unit=None, *, scale=None,
+                 step=None, min=None, max=None, precision=None):
+        self.rows = rows
+        self.columns = columns
+        self.validate_args(rows, columns, row_headers, column_headers, default, unit, scale, step, min, max, precision)
+        if scale is None:
+            if unit is None:
+                scale = [[1.0 for item in range(columns)] for row in range(rows)]
+            else:
+                try:
+                    scale = [[getattr(units, single_unit) for single_unit in row] for row in unit]
+                except AttributeError:
+                    raise KeyError("Unit {} is unknown, you must specify "
+                                "the scale manually".format(unit))
+        if unit is None:
+            unit = [["" for item in range(columns)] for row in range(rows)]
+        if step is None:
+            step = [[scale[row][column]/10.0 for column in range(columns)] for row in range(rows)]
+        if precision is None:
+            precision = [[2 for item in range(columns)] for row in range(rows)]
+
+        self.row_headers = row_headers
+        self.column_headers = column_headers
+        self.unit = unit
+        self.scale = scale
+        self.step = step
+        self.min = min
+        self.max = max
+        self.precision = precision
+
+        if default is not NoDefault:
+            self.default_value = self.process(default)
+   
+    def validate_args(self,  rows, columns, row_headers, column_headers, default,  unit, scale,
+                 step, min, max, precision):
+        if unit is not None:
+            self.check_shape(unit)
+        if scale is not None:
+            self.check_shape(scale)
+        if step is not None:
+            self.check_shape(step)
+        if min is not None:
+            self.check_shape(min)
+        if max is not None:
+            self.check_shape(max)
+        if precision is not None:
+            self.check_shape(precision)
+        if len(row_headers) != rows:
+            raise ValueError("Row header count doesn't match row count")
+        if len(column_headers) != columns:
+            raise ValueError("Column header count doesn't match column count")
+
+    def check_shape(self, array):
+        if len(array) != self.rows:
+            raise ValueError("Rows don't match row count")
+        for row in array:
+            if len(row) != self.columns:
+                raise ValueError("Columns don't match column count")
+
+    def process(self, x):
+        # If the user has set a default value for the table
+        # the input shape should be correct, and each item needs to be validated
+        self.check_shape(x)
+        for row in x:
+            for item in row:
+                try:
+                    float(item)
+                except Exception:
+                    raise ValueError("Invalid table item value")
+        return x
+    
+    def describe(self):
+        d = _SimpleArgProcessor.describe(self)
+        if hasattr(self, "default_value"):
+            d["default"] = self.default_value
+        d["rows"] = self.rows
+        d["columns"] = self.columns
+        d["row_headers"] = self.row_headers
+        d["column_headers"] = self.column_headers
+        d["unit"] = self.unit
+        d["scale"] = self.scale
+        d["step"] = self.step
+        d["min"] = self.min
+        d["max"] = self.max
+        d["precision"] = self.precision
+        return d
 
 
 class TraceArgumentManager:
