@@ -15,16 +15,18 @@ extern crate board_artiq;
 extern crate proto_artiq;
 extern crate riscv;
 extern crate alloc_list;
+extern crate refcounting;
 
 use core::{mem, ptr, slice, str, convert::TryFrom, alloc::Layout};
 use cslice::CSlice;
 use io::Cursor;
-use dyld::Library;
+use dyld::{Library, lookup_fn};
 use board_artiq::{mailbox, rpc_queue};
 use proto_artiq::{kernel_proto, rpc_proto};
 use kernel_proto::*;
 use board_misoc::csr;
 use riscv::register::{mcause, mepc, mtval};
+use refcounting::{List, RefCounted, RefAwareArray};
 
 fn send(request: &Message) {
     unsafe { mailbox::send(request as *const _ as usize) }
@@ -115,7 +117,6 @@ mod api;
 mod rtio;
 mod nrt_bus;
 mod cxp;
-mod refcounting;
 
 static mut LIBRARY: Option<Library<'static>> = None;
 static mut ALLOC: alloc_list::ListAlloc = alloc_list::EMPTY;
@@ -251,19 +252,35 @@ fn terminate(exceptions: &'static [Option<eh_artiq::Exception<'static>>],
     loop {}
 }
 
-extern fn cache_get<'a>(key: CSlice<u8>) -> *const CSlice<'a, i32> {
+extern fn cache_get(key: CSlice<u8>) -> *mut List<i32> {
     send(&CacheGetRequest {
-        key:   str::from_utf8(key.as_ref()).unwrap()
+        key: str::from_utf8(key.as_ref()).unwrap()
     });
-    recv!(&CacheGetReply { value } => {
-        value
+
+    recv!(&CacheGetReply { value, len } => {
+        unsafe {
+            let wrap = lookup_fn!(
+                b"__nac3_list_i32_wrap",
+                fn(
+                    *mut RefCounted<RefAwareArray<i32>>,
+                    usize,
+                    bool
+                ) -> *mut List<i32>
+            ).unwrap();
+            wrap(
+                value as *const _ as *mut _,
+                len as usize,
+                false
+            )
+        }
     })
 }
 
-extern "C-unwind" fn cache_put(key: CSlice<u8>, list: &CSlice<i32>) {
+extern "C-unwind" fn cache_put(key: CSlice<u8>, list: &List<i32>) {
     send(&CachePutRequest {
         key:   str::from_utf8(key.as_ref()).unwrap(),
-        value: list.as_ref()
+        value: list.backing_array(),
+        len:   list.inner.len
     });
     recv!(&CachePutReply { succeeded } => {
         if !succeeded {

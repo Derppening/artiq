@@ -193,6 +193,7 @@ dependencies = [
  "io",
  "libc 0.1.0",
  "proto_artiq",
+ "refcounting",
  "riscv",
  "unwind",
 ]

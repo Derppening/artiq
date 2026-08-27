@@ -25,3 +25,4 @@ riscv = { version = "0.6.0", features = ["inline-asm"] }
 libc = { path = "../libc" }
 unwind = { path = "../libunwind" }
 alloc_list = { path = "../liballoc_list" }
+refcounting = { path = "../librefcounting" }
