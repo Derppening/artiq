@@ -56,6 +56,14 @@ class ArgumentsDemo(EnvExperiment):
         self.setattr_argument("enum", EnumerationValue(
             ["foo", "bar", "quux"], "foo"), "Group")
 
+        row_headers = [str(x+1) for x in range(5)]
+        column_headers = ["displacement", "velocity", "acceleration"]
+        units = [["m","m/s", "m/s^2"] for row in range(5)]
+        scale = [[1.0 for x in range(3)] for y in range(5)]
+        content = [[1, 2, 2],[4, 4, 2],[9, 6, 2],[16, 8, 2],[25, 10, 2]]
+        self.setattr_argument("table", TableValue(
+            5, 3, row_headers, column_headers, content, unit=units, scale=scale))
+
         self.sc1 = SubComponent1(self)
         self.sc2 = SubComponent2(self)
 
@@ -73,6 +81,8 @@ class ArgumentsDemo(EnvExperiment):
         print(self.integer, type(self.integer))
         print(self.string)
         for i in self.scan:
+            print(i)
+        for i in self.table:
             print(i)
         self.sc1.do()
         self.sc2.do()
