@@ -641,7 +641,7 @@ class SinaraTester(EnvExperiment):
         print("*** Testing Zotino DACs and USER LEDs.")
         print("Voltages:")
         for card_n, (card_name, card_dev) in enumerate(self.zotinos):
-            voltages = [(-1)**i*(2.*card_n + .1*(i//2 + 1)) for i in range(32)]
+            voltages = [(-1)**i*(2.*card_n%10 + .1*(i//2 + 1)) for i in range(32)]
             print(card_name, " ".join(["{:.1f}".format(x) for x in voltages]))
             self.set_zotino_voltages(card_dev, voltages)
         print("Press ENTER when done.")
@@ -681,7 +681,7 @@ class SinaraTester(EnvExperiment):
         print("*** Testing Fastino DACs and USER LEDs.")
         print("Voltages:")
         for card_n, (card_name, card_dev) in enumerate(self.fastinos):
-            voltages = [(-1)**i*(2.*card_n + .1*(i//2 + 1)) for i in range(32)]
+            voltages = [(-1)**i*(2.*card_n%10 + .1*(i//2 + 1)) for i in range(32)]
             print(card_name, " ".join(["{:.1f}".format(x) for x in voltages]))
             self.set_fastino_voltages(card_dev, voltages)
         print("Press ENTER when done.")
@@ -1185,7 +1185,7 @@ class SinaraTester(EnvExperiment):
             
             passed = True
             adc_readings = []
-            volt_set = [(-1)**i*(2.*card_n + .1*(i//2 + 1)) for i in range(16)]
+            volt_set = [(-1)**i*(1.*card_n%10 + .1*(i//2 + 1)) for i in range(16)]
 
             print("Testing Shuttler DAC")
             print("Voltages:", " ".join(["{:.1f}".format(x) for x in volt_set]))
