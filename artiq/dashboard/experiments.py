@@ -308,8 +308,10 @@ class _ExperimentDock(QtWidgets.QMdiSubWindow):
         arginfo = expdesc["arginfo"]
         for k, v in overrides.items():
             if k in arginfo:
-                # Some values (e.g. scans) may have multiple defaults in a list
-                if ("default" in arginfo[k][0] and isinstance(arginfo[k][0]["default"], list)):
+                # Some values (e.g. scans) may have multiple defaults in a list.
+                # Not applicable to tables, whose default value is a list
+                if ("default" in arginfo[k][0] and isinstance(arginfo[k][0]["default"], list) 
+                                                and arginfo[k][0]["ty"] != "TableValue"):
                     arginfo[k][0]["default"].insert(0, v)
                 else:
                     arginfo[k][0]["default"] = v
