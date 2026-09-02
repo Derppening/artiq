@@ -1,7 +1,7 @@
 use core::fmt;
-use cslice::CSlice;
 use drtioaux_proto::{CXP_PAYLOAD_MAX_SIZE, CXP_PAYLOAD_MAX_SIZE_U64};
 use dyld;
+use refcounting::{RefCounted, RefAwareArray};
 
 pub const KERNELCPU_EXEC_ADDRESS:    usize = 0x45000000;
 pub const KERNELCPU_PAYLOAD_ADDRESS: usize = 0x45060000;
@@ -84,8 +84,8 @@ pub enum Message<'a> {
     RpcFlush,
 
     CacheGetRequest { key: &'a str },
-    CacheGetReply   { value: *const CSlice<'static, i32> },
-    CachePutRequest { key: &'a str, value: &'a [i32] },
+    CacheGetReply   { value: &'a RefCounted<RefAwareArray<i32>>, len: u32 },
+    CachePutRequest { key: &'a str, value: &'a RefCounted<RefAwareArray<i32>>, len: u32 },
     CachePutReply   { succeeded: bool },
 
     I2cStartRequest { busno: u32 },

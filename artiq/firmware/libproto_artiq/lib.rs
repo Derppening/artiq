@@ -14,6 +14,7 @@ extern crate byteorder;
 extern crate io;
 extern crate dyld;
 extern crate eh;
+extern crate refcounting;
 
 // Internal protocols.
 pub mod kernel_proto;
