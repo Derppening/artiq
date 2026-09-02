@@ -70,11 +70,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1787927496,
-        "narHash": "sha256-fA0xQ8KF4zKWutwpp/w7Q/XiG3p2nMJx2EqOTV8VDLI=",
+        "lastModified": 1788334911,
+        "narHash": "sha256-uOnYHr1T8R6LB8uLzf0xm4WmXcNGRZmdBSkPVlSUbnE=",
         "ref": "refs/heads/master",
-        "rev": "6165e6088868fc6d5e00102c636aceedc50a04ac",
-        "revCount": 2319,
+        "rev": "c731a79ef4bd02a4bcf652df8c629b753539526d",
+        "revCount": 2334,
         "type": "git",
         "url": "https://git.m-labs.hk/M-Labs/nac3.git"
       },
@@ -107,12 +107,12 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1786862985,
-        "narHash": "sha256-FBJRXmbGXiSUDvYEbfLYRkckayyZ6SK1UEqhCrIZ2Cs=",
-        "rev": "e5bdc4a41d4c072fe1e3787eaa0320a384741d44",
-        "revCount": 1055335,
+        "lastModified": 1787498568,
+        "narHash": "sha256-9i/VTdusq/+NM/tz+J1Re+ojkMB8MBf0QshnYfzHz30=",
+        "rev": "56c02bc00adcf003215cc4bd996d6efaf4cff188",
+        "revCount": 1060451,
         "type": "tarball",
-        "url": "https://api.flakehub.com/f/pinned/DeterminateSystems/nixpkgs-weekly/0.1.1055335%2Brev-e5bdc4a41d4c072fe1e3787eaa0320a384741d44/01a03771-351f-7d82-8fbd-a6c2e080c338/source.tar.gz"
+        "url": "https://api.flakehub.com/f/pinned/DeterminateSystems/nixpkgs-weekly/0.1.1060451%2Brev-56c02bc00adcf003215cc4bd996d6efaf4cff188/01a05b78-a1af-7e32-b8fa-6b77e11317d1/source.tar.gz"
       },
       "original": {
         "type": "tarball",

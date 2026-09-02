@@ -69,9 +69,6 @@
             packageOverrides = pyFinal: pyPrev: {
               qasync = pyPrev.qasync.overridePythonAttrs (old: {
                 patches = (old.patches or []) ++ [ ./fix-qasync.patch];
-                # https://github.com/CabbageDevelopment/qasync/issues/178
-                pythonImportsCheck = [];
-                doCheck = false;
               });
             };
           };
