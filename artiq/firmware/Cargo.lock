@@ -339,6 +339,7 @@ dependencies = [
  "logger_artiq",
  "managed 0.7.2",
  "proto_artiq",
+ "refcounting",
  "riscv",
  "smoltcp",
  "tar-no-std",

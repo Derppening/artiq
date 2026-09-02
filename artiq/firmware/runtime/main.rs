@@ -26,6 +26,7 @@ extern crate board_artiq;
 extern crate logger_artiq;
 extern crate proto_artiq;
 extern crate riscv;
+extern crate refcounting;
 #[cfg(has_drtio)]
 extern crate tar_no_std;
 

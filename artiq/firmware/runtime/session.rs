@@ -5,7 +5,7 @@ use alloc::{
 use core::{
     cell::{Cell, RefCell},
     fmt::Write as FmtWrite,
-    mem, str,
+    str,
 };
 
 use byteorder::{ByteOrder, NativeEndian};
@@ -610,16 +610,14 @@ fn process_kern_message(io: &Io, aux_mutex: &Mutex,
             },
 
             &kern::CacheGetRequest { key } => {
-                let value = session.congress.cache.get(key);
+                let (value, len) = session.congress.cache.get(key);
                 kern_send(io, &kern::CacheGetReply {
-                    // Zing! This transmute is only safe because we dynamically track
-                    // whether the kernel has borrowed any values from the cache.
-                    value: unsafe { mem::transmute(value) }
+                    value, len
                 })
             }
 
-            &kern::CachePutRequest { key, value } => {
-                let succeeded = session.congress.cache.put(key, value).is_ok();
+            &kern::CachePutRequest { key, value, len } => {
+                let succeeded = session.congress.cache.put(key, value, len).is_ok();
                 kern_send(io, &kern::CachePutReply { succeeded: succeeded })
             }
 
