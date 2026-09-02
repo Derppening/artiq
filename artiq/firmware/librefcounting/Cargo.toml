@@ -1,0 +1,8 @@
+[package]
+authors = ["M-Labs"]
+name = "refcounting"
+version = "0.0.0"
+
+[lib]
+name = "refcounting"
+path = "lib.rs"
