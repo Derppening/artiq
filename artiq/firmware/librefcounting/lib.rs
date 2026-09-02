@@ -44,7 +44,7 @@ pub struct RefAwareArray<T> {
 
 impl<T> RefAwareArray<T> {
     pub unsafe fn as_slice(&self, len: usize) -> &[T] {
-        core::slice::from_raw_parts(self.data.as_ptr(), len)
+        slice::from_raw_parts(self.data.as_ptr(), len)
     }
 
     pub unsafe fn as_mut_slice(&mut self, len: usize) -> &mut [T] {
@@ -71,14 +71,14 @@ pub type List<T> = RefCounted<RawList<T>>;
 
 impl<T> List<T> {
     pub fn as_slice(&self) -> &[T] {
-        unsafe { slice::from_raw_parts((*self.inner.items).inner.data.as_ptr(), self.inner.len as usize) }
+        unsafe { (*self.inner.items).inner.as_slice(self.inner.len as usize) }
     }
 
     pub fn as_mut_slice(&mut self) -> &mut [T] {
-        unsafe { slice::from_raw_parts_mut((*self.inner.items).inner.data.as_mut_ptr(), self.inner.len as usize) }
+        unsafe { (*self.inner.items).inner.as_mut_slice(self.inner.len as usize) }
     }
 
-    pub fn backing_array(&self) -> &RefCounted<RefAwareArray<T>> {
+    pub fn get_backing_array(&self) -> &RefCounted<RefAwareArray<T>> {
         unsafe { &*self.inner.items }
     }
 }
