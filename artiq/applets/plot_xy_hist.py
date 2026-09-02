@@ -4,6 +4,7 @@ import numpy as np
 from PyQt6 import QtWidgets
 from PyQt6.QtCore import QTimer
 import pyqtgraph
+import pyqtgraph.exporters
 
 from artiq.applets.simple import SimpleApplet
 
@@ -42,6 +43,14 @@ class XYHistPlot(QtWidgets.QSplitter):
         self.timer.setSingleShot(True)
         self.timer.timeout.connect(self.length_warning)
         self.mismatch = {'bins': False, 'xs': False}
+
+        copy_hist = self.hist_plot.getPlotItem().vb.menu.addAction("Copy image to clipboard")
+        copy_xy = self.xy_plot.getPlotItem().vb.menu.addAction("Copy image to clipboard")
+        def copy_plot(plot_widget):
+            exporter = pyqtgraph.exporters.ImageExporter(plot_widget.getPlotItem())
+            exporter.export(copy=True)
+        copy_hist.triggered.connect(lambda: copy_plot(self.hist_plot))
+        copy_xy.triggered.connect(lambda: copy_plot(self.xy_plot))
 
     def _set_full_data(self, xs, histogram_bins, histograms_counts):
         self.xy_plot.clear()

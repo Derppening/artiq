@@ -21,6 +21,7 @@ ARTIQ-10 (Unreleased)
 * Parameter entries in the device database are now supported.
 * GUI:
  - Implemented a new `TableValue` argument type for tabular data.
+ - Added `Copy image to clipboard` option to right click menu for the `plot_xy.py`, `plot_xy_hist.py`, `plot_hist.py`, and `image.py` applets
 
 Breaking changes:
 

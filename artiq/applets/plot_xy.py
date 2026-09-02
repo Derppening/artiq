@@ -4,6 +4,7 @@ import numpy as np
 import PyQt6  # make sure pyqtgraph imports Qt6
 from PyQt6.QtCore import QTimer
 import pyqtgraph
+import pyqtgraph.exporters
 
 from artiq.applets.simple import TitleApplet
 
@@ -18,6 +19,11 @@ class XYPlot(pyqtgraph.PlotWidget):
         self.mismatch = {'X values': False,
                          'Error bars': False,
                          'Fit values': False}
+        copy_option = self.getPlotItem().vb.menu.addAction("Copy image to clipboard")
+        def copy_plot():
+            exporter = pyqtgraph.exporters.ImageExporter(self.getPlotItem())
+            exporter.export(copy=True)
+        copy_option.triggered.connect(copy_plot)
 
     def data_changed(self, value, metadata, persist, mods, title):
         try:
