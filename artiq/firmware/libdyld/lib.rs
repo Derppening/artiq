@@ -110,6 +110,18 @@ pub struct Library<'a> {
     hash_chain:  &'a [Elf32_Word],
 }
 
+#[macro_export]
+macro_rules! lookup_fn {
+    ($name:expr, fn($($arg:ty),*) -> $ret:ty) => {{
+        LIBRARY.as_ref().unwrap().lookup($name).map(|addr| unsafe {
+            core::mem::transmute::<
+                usize,
+                unsafe extern "C" fn($($arg),*) -> $ret
+            >(addr as usize)
+        })
+    }};
+}
+
 impl<'a> Library<'a> {
     pub fn lookup(&self, name: &[u8]) -> Option<Elf32_Word> {
         let hash = elf_hash(name);
