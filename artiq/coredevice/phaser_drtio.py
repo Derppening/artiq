@@ -453,7 +453,7 @@ class PhaserMTDDSChannel:
 
         See also :meth:`DAC34H84.stage_nco_mixer_phase_offset_mu<artiq.coredevice.dac34h84.DAC34H84.stage_nco_mixer_phase_offset_mu>`
 
-        :param ftw: 16-bit NCO phase offset word
+        :param pow: 16-bit NCO phase offset word
         """
         self.dac.stage_nco_mixer_phase_offset_mu(self.channel_index, pow)
 
@@ -529,7 +529,7 @@ class PhaserDDS:
     def set_phase_offset_mu(self, pow):
         """Set the DDS phase offset in machine units.
 
-        :param ftw: 16-bit DDS phase offset word
+        :param pow: 16-bit DDS phase offset word
         """
         rtio_output(self.target_pow, pow)
 
@@ -537,7 +537,7 @@ class PhaserDDS:
     def set_amplitude_mu(self, asf):
         """Set the DDS amplitude in machine units.
 
-        :param ftw: 16-bit DDS amplitude scale factor
+        :param asf: 16-bit DDS amplitude scale factor
         """
         rtio_output(self.target_asf, asf)
 
