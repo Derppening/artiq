@@ -483,7 +483,7 @@ mod tag {
                     size = round_up(size, max_alignment);
                     size
                 }
-                Tag::List(_) => 8,
+                Tag::List(_) => 4,
                 Tag::Array(_, num_dims) => 4 * (1 + num_dims as usize),
                 Tag::Range(it) => {
                     let tag = it.clone().next().expect("truncated tag");
