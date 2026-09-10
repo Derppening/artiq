@@ -117,7 +117,13 @@ class ExperimentDB:
             "cur_rev": self.cur_rev
         })
 
-    def close(self):
+    async def close(self):
+        if hasattr(self, "scan_task"):
+            self.scan_task.cancel()
+            try:
+                await self.scan_task
+            except asyncio.CancelledError:
+                pass
         # The object cannot be used anymore after calling this method.
         self.repo_backend.release_rev(self.cur_rev)
 

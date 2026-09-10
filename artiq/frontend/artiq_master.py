@@ -108,7 +108,7 @@ def main():
         else:
             repo_backend = FilesystemBackend(args.repository)
         experiment_db = ExperimentDB(repo_backend, worker_handlers, args.experiment_subdir, loop=loop)
-        exit_stack.register(experiment_db.close)
+        exit_stack.register_coro(experiment_db.close)
 
         scheduler = Scheduler(RIDCounter(), worker_handlers, experiment_db,
                             args.log_submissions)
