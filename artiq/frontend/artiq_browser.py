@@ -66,6 +66,7 @@ class Browser(QtWidgets.QMainWindow):
         self.experiments = experiments.ExperimentsArea(
             browse_root, dataset_sub)
         smgr.register(self.experiments)
+        exit_stack.register_coro(self.experiments.close)
         self.experiments.setHorizontalScrollBarPolicy(
             QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.experiments.setVerticalScrollBarPolicy(

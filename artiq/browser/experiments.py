@@ -17,9 +17,10 @@ logger = logging.getLogger(__name__)
 
 
 class _ArgumentEditor(EntryTreeWidget):
-    def __init__(self, dock):
+    def __init__(self, dock, tasks):
         EntryTreeWidget.__init__(self)
         self._dock = dock
+        self.tasks = tasks
 
         if not self._dock.arguments:
             self.insertTopLevelItem(0, QtWidgets.QTreeWidgetItem(["No arguments"]))
@@ -49,13 +50,13 @@ class _ArgumentEditor(EntryTreeWidget):
         self.setItemWidget(self.bottom_item, 1, buttons)
 
     def _load_clicked(self):
-        asyncio.ensure_future(self._dock.load_hdf5_task())
+        self.tasks.append(asyncio.create_task(self._dock.load_hdf5_task()))
 
     def _recompute_arguments_clicked(self):
-        asyncio.ensure_future(self._dock._recompute_arguments())
+        self.tasks.append(asyncio.create_task(self._dock._recompute_arguments()))
 
     def reset_entry(self, key):
-        asyncio.ensure_future(self._recompute_argument(key))
+        self.tasks.append(asyncio.create_task(self._recompute_argument(key)))
 
     async def _recompute_argument(self, name):
         try:
@@ -101,7 +102,7 @@ class _ExperimentDock(QtWidgets.QMdiSubWindow):
         self.arguments = arguments
         self.options = {"log_level": logging.WARNING}
 
-        self.argeditor = _ArgumentEditor(self)
+        self.argeditor = _ArgumentEditor(self, self._area.tasks)
         self.layout.addWidget(self.argeditor, 0, 0, 1, 5)
         self.layout.setRowStretch(0, 1)
 
@@ -155,7 +156,7 @@ class _ExperimentDock(QtWidgets.QMdiSubWindow):
             if uri.scheme() == "file":
                 filename = QtCore.QDir.toNativeSeparators(uri.toLocalFile())
                 logger.debug("Loading HDF5 arguments from %s", filename)
-                asyncio.ensure_future(self.load_hdf5_task(filename))
+                self._area.tasks.append(asyncio.create_task(self.load_hdf5_task(filename)))
                 break
 
     async def compute_arginfo(self):
@@ -164,7 +165,10 @@ class _ExperimentDock(QtWidgets.QMdiSubWindow):
     async def _recompute_arguments(self, overrides={}):
         try:
             arginfo = await self.compute_arginfo()
-        except:
+        except asyncio.CancelledError:
+            logger.info("Recomputing arguments cancelled.")
+            return
+        except Exception:
             logger.error("Could not recompute arguments of '%s'",
                          self.expurl, exc_info=True)
             return
@@ -179,7 +183,7 @@ class _ExperimentDock(QtWidgets.QMdiSubWindow):
 
         state = self.argeditor.save_state()
         self.argeditor.deleteLater()
-        self.argeditor = _ArgumentEditor(self)
+        self.argeditor = _ArgumentEditor(self, self._area.tasks)
         self.layout.addWidget(self.argeditor, 0, 0, 1, 5)
         self.argeditor.restore_state(state)
 
@@ -221,7 +225,8 @@ class _ExperimentDock(QtWidgets.QMdiSubWindow):
                     argument["state"])
                 for name, argument in self.arguments.items()},
         }
-        self._run_task = asyncio.ensure_future(self._get_run_task(expid))
+        self._run_task = asyncio.create_task(self._get_run_task(expid))
+        self._area.tasks.append(self._run_task)
         self._run.setEnabled(False)
         self._terminate.setEnabled(True)
 
@@ -296,6 +301,7 @@ class ExperimentsArea(QtWidgets.QMdiArea):
         self.dataset = None
 
         self.open_experiments = []
+        self.tasks = []
 
         self._ddb = LocalDatasetDB(dataset_sub)
 
@@ -313,7 +319,7 @@ class ExperimentsArea(QtWidgets.QMdiArea):
         sub = self.currentSubWindow()
         if sub is None:
             return
-        asyncio.ensure_future(sub.load_hdf5_task(path))
+        self.tasks.append(asyncio.create_task(sub.load_hdf5_task(path)))
 
     def mousePressEvent(self, ev):
         if ev.button() == QtCore.Qt.MouseButton.LeftButton:
@@ -343,7 +349,7 @@ class ExperimentsArea(QtWidgets.QMdiArea):
             dock.restore_state(ex_state["dock"])
 
     def select_experiment(self):
-        asyncio.ensure_future(self._select_experiment_task())
+        self.tasks.append(asyncio.create_task(self._select_experiment_task()))
 
     async def _select_experiment_task(self):
         try:
@@ -391,7 +397,7 @@ class ExperimentsArea(QtWidgets.QMdiArea):
         class_name, file = expurl.split("@", maxsplit=1)
         try:
             desc = await self.examine(file)
-        except:
+        except Exception:
             logger.error("Could not examine experiment '%s'",
                          file, exc_info=True)
             return
@@ -405,7 +411,7 @@ class ExperimentsArea(QtWidgets.QMdiArea):
                            "retrying with arguments reset", expurl,
                            exc_info=True)
             dock = _ExperimentDock(self, expurl, {})
-            asyncio.ensure_future(dock._recompute_arguments())
+            self.tasks.append(asyncio.create_task(dock._recompute_arguments()))
         dock.setAttribute(QtCore.Qt.WidgetAttribute.WA_DeleteOnClose)
         self.addSubWindow(dock)
         dock.show()
@@ -419,3 +425,12 @@ class ExperimentsArea(QtWidgets.QMdiArea):
 
     def on_dock_closed(self, dock):
         self.open_experiments.remove(dock)
+
+    async def close(self):
+        for task in self.tasks:
+            task.cancel()
+        for task in self.tasks:
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
