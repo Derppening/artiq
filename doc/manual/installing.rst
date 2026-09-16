@@ -191,7 +191,7 @@ This will set your user as a trusted user, allowing you to specify untrusted sub
 Installing via MSYS2 (Windows)
 ------------------------------
 
-M-Labs recommends using our own `offline installer <|msys2_installer_link|>`_, which contains all the necessary packages and requires no additional configuration. After installation, simply launch ``MSYS2 with ARTIQ`` from the Windows Start menu.
+M-Labs recommends using our own `offline installer <|msys2_installer_link|>`_, which contains all the necessary packages, sets up MSYS2 to use the native Windows console (see note below), and requires no additional configuration. After installation, simply launch ``MSYS2 with ARTIQ`` from the Windows Start menu.
 
 Alternatively, you may install `MSYS2 <https://msys2.org>`_, then edit ``C:\msys64\etc\pacman.conf`` and add at the end: ::
 
@@ -209,6 +209,17 @@ As above in the Nix section, you may find yourself wanting to add other useful p
   $ pacman -S <package name>
 
 For more see the `MSYS2 documentation <https://www.msys2.org/docs/package-management/>`_ on package management. If your favorite package is not available with MSYS2, contact M-Labs by email at helpdesk@m-labs.hk.
+
+.. note::
+  MSYS2 by default runs on a `mintty <https://mintty.github.io/>`_ terminal. Mintty does not own a real Windows console, so processes started from it (``artiq_session``, ``artiq_ctlmgr``, etc.) may be left running in the background instead of shutting down cleanly when the window is closed (see `msys2-runtime#267 <https://github.com/msys2/msys2-runtime/issues/267>`_).
+
+  To avoid mintty, use the native Windows shell instead. Open a Windows Command Prompt and run: ::
+
+    C:\msys64\msys2_shell.cmd -defterm -no-start -clang64
+
+  To make this permanent, create a new shortcut with the above command as its target, then pin it to the Start Menu or taskbar.
+
+  MSYS2 installations obtained via the ARTIQ offline installer are not affected, as they use the native Windows console by default.
 
 Installing on OpenBSD
 ---------------------
