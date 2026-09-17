@@ -193,11 +193,11 @@
     "src-migen": {
       "flake": false,
       "locked": {
-        "lastModified": 1787538136,
-        "narHash": "sha256-Ypelv1K95wjiuTWO/vzklvt6ho8eVhpUyAR4zRneg64=",
+        "lastModified": 1789608323,
+        "narHash": "sha256-UTWFbGi3XHczfoCKTlFYJFy95ypDGPUKA9XA8mIOdp4=",
         "ref": "refs/heads/master",
-        "rev": "9ddebff9a8c584c62bc51a3a2a27c3336978904c",
-        "revCount": 2083,
+        "rev": "beffe831bf1a691eaebf9ddbb4660f8b3e7fd964",
+        "revCount": 2084,
         "type": "git",
         "url": "https://git.m-labs.hk/M-Labs/migen.git"
       },
