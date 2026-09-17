@@ -1,8 +1,12 @@
-from numpy import int32, int64
+from numpy import int32, int64, uint32
 
+from artiq.coredevice.core import Core
+from artiq.coredevice.dac34h84 import DAC34H84
+from artiq.coredevice.hmc542b import HMC542B
 from artiq.coredevice.rtio import rtio_output, rtio_input_data
+from artiq.coredevice.trf372017 import TRF372017
+
 from artiq.language.core import *
-from artiq.language.types import *
 from artiq.language.units import us, ns
 
 PHASER_GW_VARIANT_MTDDS = 1
@@ -35,15 +39,7 @@ PHASER_SERVO_REG_MAP = [
 ] = range(4)
 
 
-class _DummyIQUpconverter:
-    def __init__(self):
-        self.use_external_lo = False
-
-    @portable
-    def init(self):
-        pass
-
-
+@compile
 class PhaserMTDDS:
     """Phaser FPGA and DAC DAC34H84 configuration interface.
 
@@ -57,14 +53,13 @@ class PhaserMTDDS:
 
     """
 
-    kernel_invariants = {
-        "core",
-        "channel",
-        "dac",
-        "samples_per_cycle",
-        "target_write",
-        "target_read",
-    }
+    core: KernelInvariant[Core]
+    channel: KernelInvariant[int32]
+    dac: KernelInvariant[DAC34H84]
+    samples_per_cycle: KernelInvariant[int32]
+    target_write: KernelInvariant[int32]
+    target_read: KernelInvariant[int32]
+    gain_mus: Kernel[list[uint32]]
 
     def __init__(
         self,
@@ -78,14 +73,14 @@ class PhaserMTDDS:
         self.core = dmgr.get(core_device)
         self.dac = dmgr.get(dac_device)
 
-        self.samples_per_cycle = int(self.dac.input_sample_rate / sysclk)
+        self.samples_per_cycle = int32(self.dac.input_sample_rate / sysclk)
 
         self.target_write = self.channel << 8
         self.target_read = (
             self.channel << 8 | 1 << (len(PHASER_REG_MAP) - 1).bit_length()
         )
 
-        self.gain_mus = [0b00, 0b00]
+        self.gain_mus = [uint32(0b00), uint32(0b00)]
 
     @staticmethod
     def get_rtio_channels(channel, **kwargs):
@@ -99,15 +94,15 @@ class PhaserMTDDS:
         """
         if self.read(GW_VARIANT) != PHASER_GW_VARIANT_MTDDS:
             raise ValueError("PhaserMTDDS gateware variant mismatch")
-        delay(40.0 * us)
+        self.core.delay(40.0 * us)
         if self.read(SAMPLE_PER_CYCLE) != self.samples_per_cycle:
             raise ValueError("PhaserMTDDS samples per cycle (DDS bandwidth) mismatch")
-        delay(40.0 * us)
+        self.core.delay(40.0 * us)
 
         # Toggle reset and keep tx off
         self.set_dac_ctrl(txena=False, reset=True, sleep=False)
         self.set_dac_ctrl(txena=False, reset=False, sleep=False)
-        delay(10.0 * us) # slack
+        self.core.delay(10.0 * us)  # slack
 
         self.dac.init()
 
@@ -132,30 +127,30 @@ class PhaserMTDDS:
         self.set_dac_ctrl(txena=True, reset=False, sleep=False)
 
     @kernel
-    def write(self, address, data):
+    def write(self, address: int32, data: int32):
         rtio_output(self.target_write | address, data)
 
     @kernel
-    def read(self, address):
+    def read(self, address: int32) -> int32:
         rtio_output(self.target_read | address, 0)
         return rtio_input_data(self.channel)
 
     @kernel
-    def reset_attenuator(self, channel):
+    def reset_attenuator(self, channel: int32):
         reg = self.read(ATT_RESET_N)
-        delay(40.0 * us)
+        self.core.delay(40.0 * us)
         self.write(ATT_RESET_N, reg & ~(1 << channel))
         delay_mu(int64(self.core.ref_multiplier))
         self.write(ATT_RESET_N, reg | 1 << channel)
         delay_mu(int64(self.core.ref_multiplier))
 
     @kernel
-    def is_upconverter_variant(self) -> TBool:
+    def is_upconverter_variant(self) -> bool:
         is_upconverter = self.read(HW_VARIANT) == 0
         return is_upconverter
 
     @kernel
-    def upconverter_pll_locked(self, channel) -> TBool:
+    def upconverter_pll_locked(self, channel: int32) -> bool:
         """Return True when the upconverter PLL locks and False when the PLL unlocks
 
         This method consumes all slack.
@@ -166,12 +161,12 @@ class PhaserMTDDS:
         return locked
 
     @kernel
-    def get_available_tones(self) -> TInt32:
+    def get_available_tones(self) -> int32:
         tones = self.read(AVAILABLE_TONES)
         return tones
 
     @kernel
-    def select_dac_source(self, channel, source):
+    def select_dac_source(self, channel: int32, source: int32):
         """Select the input source of the DAC34H84
 
         * When source = 0, :math:`\\text{DAC[channel]} = \\text{TEST WORD I} + j (\\text{TEST WORD J})`
@@ -187,7 +182,7 @@ class PhaserMTDDS:
         :param source: 2-bit source select register (set to 0 for test word, 1 for DDSs, 2 for Servo)
         """
         reg = self.read(DAC_SOURCE_SEL_ADDR)
-        delay(40.0 * us)
+        self.core.delay(40.0 * us)
         self.write(
             DAC_SOURCE_SEL_ADDR,
             (reg & ~(0b11 << (2 * channel))) | (source & 0b11) << (2 * channel),
@@ -195,7 +190,7 @@ class PhaserMTDDS:
         delay_mu(int64(self.core.ref_multiplier))
 
     @kernel
-    def set_dac_ctrl(self, txena, reset, sleep):
+    def set_dac_ctrl(self, txena: bool, reset: bool, sleep: bool):
         """Set DAC34H84 control register.
 
         :param txena: Enable DAC34H84 TX when set to True
@@ -214,7 +209,7 @@ class PhaserMTDDS:
         delay_mu(int64(self.core.ref_multiplier))
 
     @kernel
-    def test_dac(self, pattern):
+    def test_dac(self, pattern: list[int32]):
         """Start DAC34H84 iotest via internal data pattern checker
 
         :param pattern: a list of 16-bit test words
@@ -241,16 +236,16 @@ class PhaserMTDDS:
         self.select_dac_source(1, 0)
 
         reg_0x01 = self.dac.read(0x01)
-        delay(40.0 * us)
+        self.core.delay(40.0 * us)
         # enable iotest & clear iotest_result
         self.dac.write(0x01, reg_0x01 | 0x8000)
         self.dac.write(0x04, 0x0000)
 
         # let it run for a while
-        delay(100.0 * us)
+        self.core.delay(100.0 * us)
 
         iotest_error = self.dac.read(0x04)
-        delay(40.0 * us)
+        self.core.delay(40.0 * us)
         if iotest_error != 0:
             raise ValueError("DAC iotest failure")
 
@@ -262,39 +257,40 @@ class PhaserMTDDS:
         self.select_dac_source(1, 1)
 
     @kernel
-    def set_pgia(self, adc_channel, gain):
+    def set_pgia(self, adc_channel: int32, gain: int32):
         """Set instrumentation amplifier gain of an ADC channel.
 
         :param adc_channel: Phaser ADC channel number (0 or 1)
         :param gain: Amplifier gain (1, 10, 100 or 1000)
         """
+        gain_mu = uint32(0b00)
         if gain == 1:
-            gain_mu = 0b00
+            gain_mu = uint32(0b00)
         elif gain == 10:
-            gain_mu = 0b01
+            gain_mu = uint32(0b01)
         elif gain == 100:
-            gain_mu = 0b10
+            gain_mu = uint32(0b10)
         elif gain == 1000:
-            gain_mu = 0b11
+            gain_mu = uint32(0b11)
         else:
             raise ValueError("Invalid gain")
         self.gain_mus[adc_channel] = gain_mu
         reg = self.read(ADC_GAIN)
-        delay(40.0 * us)
+        self.core.delay(40.0 * us)
         self.write(
             ADC_GAIN,
             (reg & ~(0b11 << (2 * adc_channel)))
-            | (gain_mu & 0b11) << (2 * adc_channel),
+            | (int32(gain_mu) & 0b11) << (2 * adc_channel),
         )
 
-    @portable(flags={"fast-math"})
-    def adc_mu_to_volt(self, data, gain) -> TFloat:
+    @portable
+    def adc_mu_to_volt(self, data: int32, gain: uint32) -> float:
         if data & (1 << 15) != 0:
             data = data - (1 << 16)
-        return (4.096 * data / 0x7FFF) * (5 / 2) / (10 ** (gain))
+        return (4.096 * float(data) / 32767.0) * (5.0 / 2.0) / (10.0 ** float(gain))
 
     @kernel
-    def get_adc_mu(self, channel) -> TInt32:
+    def get_adc_mu(self, channel: int32) -> int32:
         """Return the latest ADC reading in machine units.
 
         This method consumes all slack.
@@ -309,7 +305,7 @@ class PhaserMTDDS:
             return (data >> 16) & 0xFFFF
 
     @kernel
-    def get_adc(self, channel) -> TFloat:
+    def get_adc(self, channel: int32) -> float:
         """Return the latest ADC reading in SI units.
 
         This method consumes all slack.
@@ -320,6 +316,7 @@ class PhaserMTDDS:
         return self.adc_mu_to_volt(self.get_adc_mu(channel), self.gain_mus[channel])
 
 
+@compile
 class PhaserMTDDSChannel:
     """Phaser channel with IQ multitone DDS.
 
@@ -342,24 +339,21 @@ class PhaserMTDDSChannel:
     Attributes:
 
     * :attr:`attenuator`: A :class:`HMC542B<artiq.coredevice.hmc542b.HMC542B>`.
-    * :attr:`upconverter`: A :class:`TRF372017<artiq.coredevice.trf372017.TRF372017>` if ``iquc_device`` is provided.
+    * :attr:`upconverter`: An :class:`Option<artiq.language.core.Option>`\\ [:class:`TRF372017<artiq.coredevice.trf372017.TRF372017>`] if ``iquc_device`` is provided.
     * :attr:`servo`: A :class:`PhaserServo`.
     * :attr:`ddss`: List of :class:`PhaserDDS`.
 
     """
 
-    kernel_invariants = {
-        "core",
-        "channel_index",
-        "tones",
-        "fpga",
-        "dac",
-        "attenuator",
-        "servo",
-        "has_upconverter",
-        "upconverter",
-        "ddss",
-    }
+    core: KernelInvariant[Core]
+    channel_index: KernelInvariant[int32]
+    tones: KernelInvariant[int32]
+    fpga: KernelInvariant[PhaserMTDDS]
+    dac: KernelInvariant[DAC34H84]
+    attenuator: KernelInvariant[HMC542B]
+    servo: KernelInvariant[PhaserServo]
+    upconverter: KernelInvariant[Option[TRF372017]]
+    ddss: KernelInvariant[list[PhaserDDS]]
 
     def __init__(
         self,
@@ -384,11 +378,9 @@ class PhaserMTDDSChannel:
         self.servo = dmgr.get(servo_device)
 
         if iquc_device is None:
-            self.upconverter = _DummyIQUpconverter()
-            self.has_upconverter = False
+            self.upconverter = none
         else:
-            self.upconverter = dmgr.get(iquc_device)
-            self.has_upconverter = True
+            self.upconverter = Some(dmgr.get(iquc_device))
         self.ddss = [dmgr.get(dds_device_prefix + str(i)) for i in range(tones)]
 
     @kernel
@@ -398,28 +390,31 @@ class PhaserMTDDSChannel:
         Verify the number of tones and hardware variant, reset attenuators and initialize upconverter if available.
         """
         if self.fpga.get_available_tones() != self.tones:
+            # print_rpc(self.fpga.get_available_tones())
+            # print_rpc(self.tones)
             raise ValueError("PhaserMTDDS number of available tones mismatch")
-        delay(40.0 * us)
-        if self.has_upconverter != self.fpga.is_upconverter_variant():
+        self.core.delay(40.0 * us)
+        if self.upconverter.is_some() != self.fpga.is_upconverter_variant():
             raise ValueError("PhaserMTDDS hardware variant mismatch")
-        delay(40.0 * us)
+        self.core.delay(40.0 * us)
 
         self.fpga.reset_attenuator(self.channel_index)
-        delay(10.0 * us) # slack
+        self.core.delay(10.0 * us)  # slack
 
-        if self.has_upconverter:
-            self.upconverter.init()
+        if self.upconverter.is_some():
+            upconverter = self.upconverter.unwrap()
+            upconverter.init()
 
             # SLWS224E datasheet didn't mention any PLL lock time, 500 us should be enough
-            delay(500 * us)
+            self.core.delay(500.0 * us)
 
             # External LO doesn't use PLL, no need to check lock status
-            if not (self.upconverter.use_external_lo or self.upconverter_pll_locked()):
+            if not (upconverter.use_external_lo or self.upconverter_pll_locked()):
                 raise ValueError("TRF372017 PLL fails to lock")
-            delay(40.0 * us)
+            self.core.delay(40.0 * us)
 
     @kernel
-    def upconverter_pll_locked(self) -> TBool:
+    def upconverter_pll_locked(self) -> bool:
         """Returns whether the upconverter PLL is locked
 
         This method consumes all slack.
@@ -427,12 +422,14 @@ class PhaserMTDDSChannel:
         See also :meth:`PhaserMTDDS.upconverter_pll_locked`
 
         """
-        if self.upconverter.use_external_lo: 
-            raise ValueError("External LO is used and PLL is bypassed")
+        if self.upconverter.is_some():
+            upconverter = self.upconverter.unwrap()
+            if upconverter.use_external_lo:
+                raise ValueError("External LO is used and PLL is bypassed")
         return self.fpga.upconverter_pll_locked(self.channel_index)
 
     @kernel
-    def stage_dac_nco_mixer_frequency_mu(self, ftw):
+    def stage_dac_nco_mixer_frequency_mu(self, ftw: uint32):
         """Stage the DAC NCO mixer frequency in machine units.
 
         Before using DAC NCO mixer, the mixer must be enabled via :meth:`DAC34H84.enable_mixer<artiq.coredevice.dac34h84.DAC34H84.enable_mixer>`.
@@ -442,10 +439,10 @@ class PhaserMTDDSChannel:
 
         :param ftw: 32-bit NCO frequency tuning word
         """
-        self.dac.stage_nco_mixer_frequency_mu(self.channel_index, ftw)
+        self.dac.stage_nco_mixer_frequency_mu(self.channel_index, int32(ftw))
 
     @kernel
-    def stage_dac_nco_mixer_phase_offset_mu(self, pow):
+    def stage_dac_nco_mixer_phase_offset_mu(self, pow: uint32):
         """Stage the DAC NCO mixer phase offset in machine units.
 
         Before using DAC NCO mixer, the mixer must be enabled via :meth:`DAC34H84.enable_mixer<artiq.coredevice.dac34h84.DAC34H84.enable_mixer>`.
@@ -455,10 +452,10 @@ class PhaserMTDDSChannel:
 
         :param pow: 16-bit NCO phase offset word
         """
-        self.dac.stage_nco_mixer_phase_offset_mu(self.channel_index, pow)
+        self.dac.stage_nco_mixer_phase_offset_mu(self.channel_index, int32(pow))
 
     @kernel
-    def stage_dac_nco_mixer_frequency(self, frequency):
+    def stage_dac_nco_mixer_frequency(self, frequency: float):
         """Stage the DAC NCO mixer frequency in SI units.
 
         Before using DAC NCO mixer, the mixer must be enabled via :meth:`DAC34H84.enable_mixer<artiq.coredevice.dac34h84.DAC34H84.enable_mixer>`.
@@ -471,7 +468,7 @@ class PhaserMTDDSChannel:
         self.dac.stage_nco_mixer_frequency(self.channel_index, frequency)
 
     @kernel
-    def stage_dac_nco_mixer_phase_offset(self, phase):
+    def stage_dac_nco_mixer_phase_offset(self, phase: float):
         """Stage the DAC NCO mixer phase offset in SI units.
 
         Before using DAC NCO mixer, the mixer must be enabled via :meth:`DAC34H84.enable_mixer<artiq.coredevice.dac34h84.DAC34H84.enable_mixer>`.
@@ -484,7 +481,7 @@ class PhaserMTDDSChannel:
         self.dac.stage_nco_mixer_phase_offset(self.channel_index, phase)
 
     @kernel
-    def select_dac_source(self, source):
+    def select_dac_source(self, source: int32):
         """Select the input source of the DAC34H84
 
         See also :meth:`PhaserMTDDS.select_dac_source`
@@ -494,6 +491,7 @@ class PhaserMTDDSChannel:
         self.fpga.select_dac_source(self.channel_index, source)
 
 
+@compile
 class PhaserDDS:
     """Phaser IQ DDS driver
 
@@ -501,7 +499,13 @@ class PhaserDDS:
     :param core_device: Core device name (default: "core").
     """
 
-    kernel_invariants = {"core", "channel"}
+    core: KernelInvariant[Core]
+    channel: KernelInvariant[int32]
+    bandwidth: Kernel[float]
+    target_ftw: Kernel[int32]
+    target_pow: Kernel[int32]
+    target_asf: Kernel[int32]
+    target_clear: Kernel[int32]
 
     def __init__(self, dmgr, channel, bandwidth, core_device="core"):
         self.channel = channel
@@ -518,46 +522,46 @@ class PhaserDDS:
         return [(channel, "channel")]
 
     @kernel
-    def set_frequency_mu(self, ftw):
+    def set_frequency_mu(self, ftw: uint32):
         """Set the DDS frequency in machine units.
 
         :param ftw: 32-bit DDS frequency tuning word
         """
-        rtio_output(self.target_ftw, ftw)
+        rtio_output(self.target_ftw, int32(ftw))
 
     @kernel
-    def set_phase_offset_mu(self, pow):
+    def set_phase_offset_mu(self, pow: uint32):
         """Set the DDS phase offset in machine units.
 
         :param pow: 16-bit DDS phase offset word
         """
-        rtio_output(self.target_pow, pow)
+        rtio_output(self.target_pow, int32(pow))
 
     @kernel
-    def set_amplitude_mu(self, asf):
+    def set_amplitude_mu(self, asf: uint32):
         """Set the DDS amplitude in machine units.
 
         :param asf: 16-bit DDS amplitude scale factor
         """
-        rtio_output(self.target_asf, asf)
+        rtio_output(self.target_asf, int32(asf))
 
-    @portable(flags={"fast-math"})
-    def frequency_to_ftw(self, frequency) -> TInt32:
+    @portable
+    def frequency_to_ftw(self, frequency: float) -> uint32:
         """Return the 32-bit frequency tuning word corresponding to the given frequency in Hz."""
-        return int32(round((int64(1) << 32) * (frequency / self.bandwidth)))
+        return uint32(round(float(int64(1) << 32) * (frequency / self.bandwidth)))
 
-    @portable(flags={"fast-math"})
-    def turns_to_pow(self, turns) -> TInt32:
+    @portable
+    def turns_to_pow(self, turns: float) -> uint32:
         """Return the 16-bit phase offset word corresponding to the given phase in turns."""
-        return int32(round(turns * (1 << 16)))
+        return uint32(round(turns * float(1 << 16)))
 
-    @portable(flags={"fast-math"})
-    def amplitude_to_asf(self, amplitude) -> TInt32:
+    @portable
+    def amplitude_to_asf(self, amplitude: float) -> uint32:
         """Return the 16-bit amplitude scale factor corresponding to the given fractional amplitude."""
-        return int32(round(amplitude * ((1 << 15) - 1)))
+        return uint32(round(amplitude * float((1 << 15) - 1)))
 
     @kernel
-    def set_frequency(self, frequency):
+    def set_frequency(self, frequency: float):
         """Set the DDS frequency in SI units.
 
         Due to different DAC interpolation ratio between DDS bandwidth, the resulting frequency responses are different between bandwidths:
@@ -570,7 +574,7 @@ class PhaserDDS:
         self.set_frequency_mu(self.frequency_to_ftw(frequency))
 
     @kernel
-    def set_phase_offset(self, phase):
+    def set_phase_offset(self, phase: float):
         """Set the DDS phase offset in SI units.
 
         :param phase: DDS phase offset in turns (0.0 to 1.0)
@@ -578,7 +582,7 @@ class PhaserDDS:
         self.set_phase_offset_mu(self.turns_to_pow(phase))
 
     @kernel
-    def set_amplitude(self, amplitude):
+    def set_amplitude(self, amplitude: float):
         """Set the DDS amplitude in SI units.
 
         :param amplitude: DDS amplitude (-1.0 to 1.0)
@@ -586,7 +590,7 @@ class PhaserDDS:
         self.set_amplitude_mu(self.amplitude_to_asf(amplitude))
 
     @kernel
-    def enable_phase_accumulator(self, enable):
+    def enable_phase_accumulator(self, enable: bool):
         """Enable/disable the DDS phase accmulator.
 
         When the phase accmulator is disabled, the phase value is set to zero.
@@ -597,19 +601,18 @@ class PhaserDDS:
         rtio_output(self.target_clear, 0 if enable else 1)
 
 
+@compile
 class PhaserServo:
     """Phaser Servo driver
 
     :param core_device: Core device name (default: "core").
     """
 
-    kernel_invariants = {
-        "core",
-        "channel",
-        "addr_offset",
-        "target_write",
-        "target_read",
-    }
+    core: KernelInvariant[Core]
+    channel: KernelInvariant[int32]
+    addr_offset: KernelInvariant[int32]
+    target_write: KernelInvariant[int32]
+    target_read: KernelInvariant[int32]
 
     def __init__(self, dmgr, channel, core_device="core"):
         self.channel = channel
@@ -627,31 +630,33 @@ class PhaserServo:
         return [(channel, "channel")]
 
     @kernel
-    def write(self, address, data):
+    def write(self, address: int32, data: int32):
         rtio_output(self.target_write | address, data)
 
     @kernel
-    def read(self, address):
+    def read(self, address: int32) -> int32:
         rtio_output(self.target_read | address, 0)
         return rtio_input_data(self.channel)
 
-    @portable(flags={"fast-math"})
-    def setpoint_to_offset(self, setpoint) -> TInt32:
+    @portable
+    def setpoint_to_offset(self, setpoint: float) -> int32:
         """Return the 16-bit IIR offset corresponding to the given fractional setpoint."""
-        return int32(round(setpoint * ((1 << 15) - 1)))
+        return int32(round(setpoint * float((1 << 15) - 1)))
 
-    @portable(flags={"fast-math"})
-    def full_scale_to_y_mu(self, y) -> TInt32:
+    @portable
+    def full_scale_to_y_mu(self, y: float) -> int32:
         """Return the 16-bit IIR y filter output corresponding to the given fractional filter output."""
-        return int32(round(y * ((1 << 15) - 1)))
+        return int32(round(y * float((1 << 15) - 1)))
 
-    @portable(flags={"fast-math"})
-    def y_mu_to_full_scale(self, y_mu) -> TFloat:
+    @portable
+    def y_mu_to_full_scale(self, y_mu: int32) -> float:
         """Return the fractional filter output to the given 16-bit IIR y filter output."""
         return y_mu / ((1 << 15) - 1)
 
-    @portable(flags={"fast-math"})
-    def pi_to_iir_mu(self, kp, ki=0.0, g=0.0):
+    @portable
+    def pi_to_iir_mu(
+        self, kp: float, ki: float = 0.0, g: float = 0.0
+    ) -> tuple[int32, int32, int32]:
         """Return the IIR coefficients to the given Proportional–Integral (PI) controller.
 
         The PI controller transfer function is:
@@ -687,14 +692,14 @@ class PhaserServo:
         """
         NORM = 1 << 11
         COEFF_LIMIT = 1 << 17  # 18-bit filter coefficients
-        T_CYCLE = 208 * ns  # 4.8 MSPS ADC sample rate
+        T_CYCLE = 208.0 * ns  # 4.8 MSPS ADC sample rate
 
         # Bilinear transform is used to convert the transfer function to a first order IIR.
         if ki == 0.0:
             # pure P
             a1 = 0
             b1 = 0
-            b0 = int(round(kp * NORM))
+            b0 = int32(round(kp * float(NORM)))
         else:
             # I or PI
             ki = ki * (T_CYCLE / 2.0)
@@ -703,9 +708,9 @@ class PhaserServo:
                 a1 = NORM
             else:
                 c = 1.0 / (1.0 + ki / g)
-                a1 = int(round((2.0 * c - 1.0) * NORM))
-            b0 = int(round((kp + ki * c) * NORM))
-            b1 = int(round((kp + (ki - 2.0 * kp) * c) * NORM))
+                a1 = int32(round((2.0 * c - 1.0) * float(NORM)))
+            b0 = int32(round((kp + ki * c) * float(NORM)))
+            b1 = int32(round((kp + (ki - 2.0 * kp) * c) * float(NORM)))
             if b1 == -b0:
                 raise ValueError("integrator gain and/or gain limit too low")
 
@@ -720,7 +725,14 @@ class PhaserServo:
         return b0, a1, b1
 
     @kernel
-    def set_iir(self, profile, setpoint, kp, ki=0.0, g=0.0):
+    def set_iir(
+        self,
+        profile: int32,
+        setpoint: float,
+        kp: float,
+        ki: float = 0.0,
+        g: float = 0.0,
+    ):
         """Set a profile's IIR coefficients.
 
         .. warning:: The coefficients update are applied sequentially. To apply a synchronous change, use a different profile as buffer or disable the IIR before writing to the active profile.
@@ -739,7 +751,9 @@ class PhaserServo:
         self.set_iir_mu(profile, self.setpoint_to_offset(setpoint), b0, a1, b1)
 
     @kernel
-    def set_iir_mu(self, profile, offset, b0, a1, b1):
+    def set_iir_mu(
+        self, profile: int32, offset: int32, b0: int32, a1: int32, b1: int32
+    ):
         """Set a profile's IIR coefficients in machine unit.
 
         This method advances the timeline by four coarse RTIO clock cycles.
@@ -765,7 +779,7 @@ class PhaserServo:
         delay_mu(int64(self.core.ref_multiplier))
 
     @kernel
-    def iir_output_clipped(self) -> TBool:
+    def iir_output_clipped(self) -> bool:
         """Returns whether the IIR output is clipped
 
         This method consumes all slack.
@@ -773,7 +787,7 @@ class PhaserServo:
         return self.read(SERVO_CLIPPED) != 0
 
     @kernel
-    def set_y1_mu(self, profile, y1):
+    def set_y1_mu(self, profile: int32, y1: int32):
         """Set a profile's IIR y[n-1] in machine unit.
 
         :param profile: Profile number (0 to 3)
@@ -784,7 +798,7 @@ class PhaserServo:
         delay_mu(int64(self.core.ref_multiplier))
 
     @kernel
-    def get_y1_mu(self, profile) -> TInt32:
+    def get_y1_mu(self, profile: int32) -> int32:
         """Return a profile's IIR y[n-1] in machine unit.
 
         This method consumes all slack.
@@ -796,7 +810,7 @@ class PhaserServo:
         return self.read(profile_addr + 5)
 
     @kernel
-    def set_y1(self, profile, y1):
+    def set_y1(self, profile: int32, y1: float):
         """Set a profile's IIR y[n-1].
 
         :param profile: Profile number (0 to 3)
@@ -805,7 +819,7 @@ class PhaserServo:
         self.set_y1_mu(profile, self.full_scale_to_y_mu(y1))
 
     @kernel
-    def get_y1(self, profile) -> TFloat:
+    def get_y1(self, profile: int32) -> float:
         """Return a profile's IIR y[n-1].
 
         This method consumes all slack.
@@ -816,7 +830,7 @@ class PhaserServo:
         return self.y_mu_to_full_scale(self.get_y1_mu(profile))
 
     @kernel
-    def enable_iir(self, enable):
+    def enable_iir(self, enable: bool):
         """Enable/disable the IIR.
 
         :param enable: Enable the IIR if True
@@ -825,7 +839,7 @@ class PhaserServo:
         delay_mu(int64(self.core.ref_multiplier))
 
     @kernel
-    def set_active_profile(self, profile):
+    def set_active_profile(self, profile: int32):
         """Set the active profile used by the IIR.
 
         :param profile: Profile number (0 to 3)
@@ -834,7 +848,7 @@ class PhaserServo:
         delay_mu(int64(self.core.ref_multiplier))
 
     @kernel
-    def select_iir_source(self, adc_channel):
+    def select_iir_source(self, adc_channel: int32):
         """Select the ADC channel to be the input source of the IIR.
 
         :param adc_channel: Phaser ADC channel number (0 or 1)
