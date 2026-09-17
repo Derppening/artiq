@@ -19,6 +19,7 @@ ARTIQ-10 (Unreleased)
  - `ipv6_default_route` was renamed to `ip6_default_route`
 * Setting Zotino voltages in the dashboard moninj panel is now supported.
 * Parameter entries in the device database are now supported.
+* The MSYS2 launcher set up by the offline installer now runs on a native Windows console instead of `mintty <https://mintty.github.io/>`_, which does not own a real console and `could leave processes running <https://github.com/msys2/msys2-runtime/issues/267>`_ after the window was closed.
 * GUI:
  - Implemented a new `TableValue` argument type for tabular data.
  - Added `Copy image to clipboard` option to right click menu for the `plot_xy.py`, `plot_xy_hist.py`, `plot_hist.py`, and `image.py` applets
