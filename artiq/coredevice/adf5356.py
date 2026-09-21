@@ -626,7 +626,7 @@ def calculate_pll(f_vco: float, f_pfd: int64) -> tuple[int32, int32, tuple[int32
 
     where
         
-    ``mod1 = 2**24`` and ``mod2 <= 2**28``
+    ``mod1 = 2**24`` and ``2 <= mod2 <= 2**28 - 1``
 
     :param f_vco: target VCO frequency
     :param f_pfd: PFD frequency
@@ -642,14 +642,19 @@ def calculate_pll(f_vco: float, f_pfd: int64) -> tuple[int32, int32, tuple[int32
     frac1, frac2 = int32(r // float(f_pfd)), int64(r % float(f_pfd))
 
     # auxiliary fractional part
-    mod2 = f_pfd
+    if frac2 == int64(0):
+        mod2 = int64(2)
+    else:
+        mod2 = f_pfd
 
-    while mod2 > int64(ADF5356_MAX_MODULUS2):
-        mod2 >>= 1
-        frac2 >>= 1
+        while mod2 > int64(ADF5356_MAX_MODULUS2):
+            mod2 >>= 1
+            frac2 >>= 1
 
-    gcd_div = gcd(frac2, mod2)
-    mod2 //= gcd_div
-    frac2 //= gcd_div
+        gcd_div = gcd(frac2, mod2)
+        mod2 //= gcd_div
+        frac2 //= gcd_div
+
+    assert int64(2) <= mod2 <= int64(ADF5356_MAX_MODULUS2)
 
     return n, frac1, split_msb_lsb_28b(int32(frac2)), split_msb_lsb_28b(int32(mod2))
