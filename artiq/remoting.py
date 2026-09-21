@@ -131,7 +131,7 @@ class SSHClient(Client):
     def prepare_download(self, filename):
         tmpname = "".join([random.Random().choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
                            for _ in range(6)])
-        remote_filename = "{}/{}_{}".format(self._tmpr, tmpname, filename)
+        remote_filename = "{}/{}_{}".format(self._tmpr, tmpname, os.path.basename(filename))
 
         _sftp = self.get_sftp()
         logger.debug("Downloading {}".format(filename))
