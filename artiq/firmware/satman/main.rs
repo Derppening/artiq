@@ -15,6 +15,7 @@ extern crate crc;
 extern crate cslice;
 extern crate io;
 extern crate eh;
+extern crate refcounting;
 
 use core::convert::TryFrom;
 use board_misoc::{csr, ident, clock, config, i2c, pmp};

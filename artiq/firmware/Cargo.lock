@@ -372,6 +372,7 @@ dependencies = [
  "log",
  "logger_artiq",
  "proto_artiq",
+ "refcounting",
  "riscv",
 ]
 
