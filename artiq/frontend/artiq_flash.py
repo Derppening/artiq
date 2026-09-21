@@ -4,8 +4,10 @@ import argparse
 import os
 import shutil
 import re
+import struct
 from functools import partial
 from collections import defaultdict
+from datetime import datetime
 
 from sipyco import common_args
 
@@ -26,6 +28,9 @@ Valid commands:
     * load: load the main gateware bitstream into device (volatile but fast).
     * start: trigger the target to (re)load its gateware bitstream from flash.
       If your core device is reachable by network, prefer 'artiq_coremgmt reboot'. 
+    * backup: read flash partitions and save them under a user-defined backup
+      directory. Gateware, storage and firmware are truncated to their actual data
+      size, while the complete bootloader partition is preserved.
 
 Valid regions for write and erase actions:
     
@@ -109,6 +114,101 @@ def add_commands(script, *commands, **substs):
     script += [command.format(**substs) for command in commands]
 
 
+def get_full_partitions(config):
+    result = {}
+    previous_name, previous_bankname, previous_address = None, None, None
+
+    for name, value in config.items():
+        if name not in ["programmer", "flash_size"]:
+            bankname, address = value
+            if previous_name is not None:
+                if address < previous_address:
+                    raise ValueError(
+                        "partition addresses are not in ascending order")
+                result[previous_name] = (
+                    previous_bankname,
+                    previous_address,
+                    address - previous_address
+                )
+            previous_name, previous_bankname, previous_address = name, bankname, address
+    result[previous_name] = (
+        previous_bankname,
+        previous_address,
+        config["flash_size"] - previous_address
+    )
+    return result
+
+
+def get_fbi_size(filename):
+    # An fbi starts with an 8-byte little-endian header containing two 32-bit
+    # values: the firmware payload length and its CRC. The complete fbi size is
+    # therefore the payload length plus the 8-byte header.
+    with open(filename, "rb") as f:
+        header = f.read(8)
+    if len(header) != 8:
+        raise ValueError("truncated FBI header")
+
+    length, _ = struct.unpack("<II", header)
+    return 8 + length
+
+
+def get_storage_size(filename):
+    # Storage consists of variable-length records. Each record starts with a
+    # 32-bit big-endian value containing its total size. A value of 0xffffffff
+    # marks the end of the stored records, include in the returned size
+    with open(filename, "rb") as f:
+        data = f.read()
+    offset = 0
+    while offset + 4 <= len(data):
+        record_size = struct.unpack_from(">I", data, offset)[0]
+        if record_size == 0xffffffff:
+            return offset + 4
+        if record_size < 4:
+            raise ValueError("invalid storage record size")
+        offset += record_size
+    raise ValueError("storage terminator not found")
+
+
+def get_gateware_size(filename):
+    with open(filename, "rb") as f:
+        data = f.read()
+
+    # From UG470 (v1.17) table 6-1:
+    # xilinx synchronization word
+    sync = bytes.fromhex("aa995566")
+    # DESYNC command
+    desync = bytes.fromhex("300080010000000d")
+    # xilinx NOOP packet
+    noop = bytes.fromhex("20000000")
+    # identifies the boundary between the original top.bin and
+    # unused erased flash.
+    erased = bytes.fromhex("ffffffff")
+
+    sync_offset = data.find(sync)
+    if sync_offset == -1:
+        raise ValueError("Xilinx synchronization word not found in gateware")
+
+    search_offset = sync_offset + len(sync)
+    while True:
+        desync_offset = data.find(desync, search_offset)
+        if desync_offset == -1:
+            raise ValueError(
+                "Xilinx DESYNC command followed by erased flash "
+                "not found in gateware"
+            )
+        offset = desync_offset + len(desync)
+        while offset + 4 <= len(data) and data[offset:offset + 4] == noop:
+            offset += 4
+        if offset + 4 <= len(data) and data[offset:offset + 4] == erased:
+            return offset
+        search_offset = desync_offset + 4
+
+
+def truncate_file(filename, size):
+    with open(filename, "r+b") as f:
+        f.truncate(size)
+
+
 class Programmer:
     def __init__(self, client, preinit_script):
         self._client = client
@@ -149,7 +249,7 @@ class Programmer:
 
         firstsector, erase_list = None, []
         for region, t in config.items():
-            if region == "programmer":
+            if region in ["programmer", "flash_size"]:
                 continue
             sector = t[1] // self._sector_size
 
@@ -279,6 +379,7 @@ def main():
     config = {
         "kasli": {
             "programmer":   partial(ProgrammerXC7, board="kasli", proxy="bscan_spi_xc7a100t.bit"),
+            "flash_size":            0x1000000,
             "gateware":     ("spi0", 0x000000),
             "bootloader":   ("spi0", 0x400000),
             "storage":      ("spi0", 0x440000),
@@ -286,6 +387,7 @@ def main():
         },
         "phaser": {
             "programmer":   partial(ProgrammerXC7, board="phaser", proxy="bscan_spi_xc7a100t.bit"),
+            "flash_size":            0x1000000,
             "gateware":     ("spi0", 0x000000),
             "bootloader":   ("spi0", 0x400000),
             "storage":      ("spi0", 0x440000),
@@ -293,6 +395,7 @@ def main():
         },
         "efc1v0": {
             "programmer":   partial(ProgrammerXC7, board="efc", proxy="bscan_spi_xc7a100t.bit"),
+            "flash_size":            0x1000000,
             "gateware":     ("spi0", 0x000000),
             "bootloader":   ("spi0", 0x600000),
             "storage":      ("spi0", 0x640000),
@@ -300,6 +403,7 @@ def main():
         },
         "efc1v1": {
             "programmer":   partial(ProgrammerXC7, board="efc", proxy="bscan_spi_xc7a200t.bit"),
+            "flash_size":            0x1000000,
             "gateware":     ("spi0", 0x000000),
             "bootloader":   ("spi0", 0x600000),
             "storage":      ("spi0", 0x640000),
@@ -307,6 +411,7 @@ def main():
         },
         "efc1v2": {
             "programmer":   partial(ProgrammerXC7, board="efc", proxy="bscan_spi_xc7a200t.bit"),
+            "flash_size":            0x1000000,
             "gateware":     ("spi0", 0x000000),
             "bootloader":   ("spi0", 0x600000),
             "storage":      ("spi0", 0x640000),
@@ -314,6 +419,7 @@ def main():
         },
         "kc705": {
             "programmer":   partial(ProgrammerXC7, board="kc705", proxy="bscan_spi_xc7k325t.bit"),
+            "flash_size":            0x1000000, # From UG810 (v1.9)
             "gateware":     ("spi0", 0x000000),
             "bootloader":   ("spi0", 0xaf0000),
             "storage":      ("spi0", 0xb30000),
@@ -323,26 +429,28 @@ def main():
 
     cmds = []
     for cmd in args.cmds:
-        cmd, *regions = cmd.replace("=", ",").split(",")
-        if not regions:
-            if cmd == "write":
-                regions = ["gateware", "bootloader", "firmware"]
-            elif cmd == "erase":
-                regions = ["gateware", "bootloader", "storage", "firmware"]
+        cmd, *arguments = cmd.replace("=", ",").split(",")
+        if cmd == "backup" and len(arguments) != 1:
+            raise ValueError("the backup directory name must be provided")
+        elif cmd in ["load", "start"] and arguments:
+            raise ValueError(f"invalid command: {cmd}={','.join(arguments)}")
         elif cmd in ["write", "erase"]:
-            if not(all(region in list(config)[1:] for region in regions)):
-                raise ValueError(f"unrecognized flash region(s): '{regions}'")
-        else:
-            raise ValueError(f"invalid command: {cmd}={','.join(regions)}")
+            if not arguments:
+                if cmd == "write":
+                    arguments = ["gateware", "bootloader", "firmware"]
+                elif cmd == "erase":
+                    arguments = ["gateware", "bootloader", "storage", "firmware"]
+            if not(all(region in list(config)[2:] for region in arguments)):
+                raise ValueError(f"unrecognized flash region(s): '{arguments}'")
         
         if cmd in ["write", "load"] and args.dir is None:
-            if any(region in regions for region in ["gateware", "bootloader", "firmware"]):
+            if any(region in arguments for region in ["gateware", "bootloader", "firmware"]):
                 raise ValueError("the directory containing the binaries needs to be specified using -d.")
         if cmd == "write" and args.storage is None:
-            if "storage" in regions:
+            if "storage" in arguments:
                 raise ValueError("the storage image file name needs to be specified using -f.")
 
-        cmds.append([cmd, set(regions)])
+        cmds.append([cmd, set(arguments)])
 
     binary_dir = args.dir
 
@@ -353,11 +461,14 @@ def main():
 
     programmer = config["programmer"](client, preinit_script=args.preinit_command)
 
-    for cmd, regions in cmds:
+    programmer_pending = False
+    for cmd, arguments in cmds:
+        if cmd != "backup":
+            programmer_pending = True
         if cmd == "write":
             found_bins = (discover_bins(binary_dir, args.srcbuild)
                           if binary_dir is not None else {})
-            for region in regions:
+            for region in arguments:
                 if region == "storage":
                     path = args.storage
                 else:
@@ -372,14 +483,65 @@ def main():
         elif cmd == "start":
             programmer.start()
         elif cmd == "erase":
-            programmer.erase(regions, config)
+            programmer.erase(arguments, config)
+        elif cmd == "backup":
+            backup_directory = next(iter(arguments))
+            backup_paths = {
+                "gateware": artifact_path(
+                    backup_directory,
+                    "top.bin"
+                ),
+                "bootloader": artifact_path(
+                    backup_directory,
+                    "bootloader.bin"
+                ),
+                "storage": os.path.join(
+                    backup_directory,
+                    "storage.bin"
+                ),
+                "firmware": os.path.join(
+                    backup_directory,
+                    "firmware.fbi"
+                )
+            }
+            for filename in backup_paths.values():
+                os.makedirs(os.path.dirname(filename), exist_ok=True)
+
+            for region, (bankname, address, partition_length) in get_full_partitions(config).items():
+                programmer.read_binary(
+                    bankname=bankname,
+                    address=address,
+                    length=partition_length,
+                    filename=backup_paths[region]
+                )
+
+            if args.dry_run:
+                print("\n".join(programmer.script()))
+            else:
+                programmer.run()
+                truncate_file(
+                    backup_paths["gateware"],
+                    get_gateware_size(backup_paths["gateware"])
+                )
+                truncate_file(
+                    backup_paths["storage"],
+                    get_storage_size(backup_paths["storage"])
+                )
+                truncate_file(
+                    backup_paths["firmware"],
+                    get_fbi_size(backup_paths["firmware"])
+                )
+            programmer = config["programmer"](
+                client,
+                preinit_script=args.preinit_command
+            )
         else:
             raise ValueError(f"invalid command: {cmd}")
-
-    if args.dry_run:
-        print("\n".join(programmer.script()))
-    else:
-        programmer.run()
+    if programmer_pending:
+        if args.dry_run:
+            print("\n".join(programmer.script()))
+        else:
+            programmer.run()
 
 
 if __name__ == "__main__":
