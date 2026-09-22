@@ -140,7 +140,7 @@
       nativeBuildInputs = [pkgs.qt6.wrapQtAppsHook];
 
       propagatedBuildInputs =
-        [nac3.packages.x86_64-linux.nac3artiq-pgo sipyco.packages.x86_64-linux.sipyco pkgs.qt6.qtsvg artiq-comtools.packages.x86_64-linux.artiq-comtools]
+        [nac3.packages.x86_64-linux.nac3artiq sipyco.packages.x86_64-linux.sipyco pkgs.qt6.qtsvg artiq-comtools.packages.x86_64-linux.artiq-comtools]
         ++ (with pkgs.python3Packages; [pyqtgraph pygit2 numpy python-dateutil scipy prettytable h5py pyqt6 qasync tqdm lmdb jsonschema platformdirs]);
 
       dontWrapQtApps = true;
