@@ -23,6 +23,7 @@ ARTIQ-10 (Unreleased)
 * GUI:
  - Implemented a new `TableValue` argument type for tabular data.
  - Added `Copy image to clipboard` option to right click menu for the `plot_xy.py`, `plot_xy_hist.py`, `plot_hist.py`, and `image.py` applets
+* `artiq_flash`: a backup command has been added to save the current contents of the flash partitions to a user-defined directory. Gateware, storage and firmware are truncated to their actual data size, while the complete bootloader partition is preserved.
 
 Breaking changes:
 
