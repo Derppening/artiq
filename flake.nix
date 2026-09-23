@@ -572,6 +572,14 @@
 
             python -m unittest discover -v artiq.test.coredevice
             NAC3_OPT_LEVEL=0 python -m unittest discover -v artiq.test.coredevice
+
+            BACKUP_DIR=`mktemp -d`
+            artiq_flash -t kc705 -H rpi-1.hkg.mlsi backup=$BACKUP_DIR
+            cmp ${packages.x86_64-linux.artiq-board-kc705-nist_clock}/top.bin $BACKUP_DIR/top.bin
+            cmp ${packages.x86_64-linux.artiq-board-kc705-nist_clock}/runtime.fbi $BACKUP_DIR/firmware.fbi
+            cmp kc705_nist_clock.config $BACKUP_DIR/storage.bin
+            BOOTLOADER_SIZE=`stat -c %s ${packages.x86_64-linux.artiq-board-kc705-nist_clock}/bootloader.bin`
+            cmp -n $BOOTLOADER_SIZE ${packages.x86_64-linux.artiq-board-kc705-nist_clock}/bootloader.bin $BACKUP_DIR/bootloader.bin
           )
 
           touch $out
