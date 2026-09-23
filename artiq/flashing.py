@@ -22,7 +22,7 @@ def discover_bins(path, srcbuild=False):
         "boot": ["boot"],
         "gateware": ["gateware"],
         "bootloader": ["bootloader"],
-        "firmware": ["runtime", "satman"],
+        "firmware": ["runtime", "satman", "firmware"],
     }
 
     for name, components in bin_dict.items():
@@ -72,6 +72,7 @@ def fetch_bin(binary_dir, components, srcbuild=False):
             "bootloader": ["software", "bootloader", "bootloader.bin"],
             "runtime": ["software", "runtime", "runtime.fbi"],
             "satman": ["software", "satman", "satman.fbi"],
+            "firmware": ["software", "firmware", "firmware.fbi"]
         }[component], srcbuild=srcbuild)
 
         if not os.path.exists(path):
