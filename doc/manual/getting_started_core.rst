@@ -129,7 +129,7 @@ Try reducing the period of the generated waveform until the CPU cannot keep up w
                 print_underflow()
 
 
-.. _getting-started-parallel: 
+.. _getting-started-parallel:
 
 Parallel and sequential blocks
 ------------------------------
@@ -275,8 +275,36 @@ Try this: ::
 .. note::
     Only output events are redirected to the DMA core. Input methods inside a ``with dma`` block will be called as they would be outside of the block, in the current real-time context, and input events will be buffered normally, not to DMA.
 
+.. warning::
+    DMA traces persist across kernels, but not across reboots. If the core device is rebooted, traces must be re-recorded before they can be played.
+
 For more documentation on the methods used, see the :mod:`artiq.coredevice.dma` reference.
 
+Core device cache
+-----------------
+
+Experiments may require values computed or found in previously executed kernels. To avoid invoking an RPC, data can be stored in core device cache, accessed through :mod:`artiq.coredevice.cache`.
+
+Try following up an experiment like this one: ::
+
+    class CacheStore(EnvExperiment):
+        @kernel
+        def run(self):
+            self.cache.put("data", [0xCAFE, 0xDEAD, 0xBEEF])
+
+with a second like this: ::
+
+    class CacheGet(EnvExperiment):
+        @rpc(flags={"async"})
+        def p(self, p):
+            print([hex(_) for _ in p])
+
+        @kernel
+        def run(self):
+            self.p(self.cache.get("data"))
+
+.. note::
+    Like DMA, cached data isn't persistent across reboots.
 
 Batching
 --------
@@ -295,7 +323,7 @@ Try this: ::
         def build(self):
             self.setattr_device("core")
             self.setattr_device("core_batch")
-        
+
         @kernel
         def run(self):
             self.core.reset()
