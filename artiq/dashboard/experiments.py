@@ -655,6 +655,7 @@ class ExperimentManager:
             }
         self.submission_arguments[expurl] = arguments
         self.argument_ui_names[expurl] = ui_name
+        self.update_exparg()
         return arguments
 
     def set_argument_value(self, expurl, name, value):
@@ -838,6 +839,7 @@ class ExperimentManager:
         self.colors.update(state.get("colors", {}))
         for expurl in state["open_docks"]:
             self.open_experiment(expurl)
+        self.update_exparg()
 
     def show_quick_open(self):
         if self.is_quick_open_shown:

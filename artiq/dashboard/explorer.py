@@ -268,6 +268,22 @@ class ExplorerDock(QtWidgets.QDockWidget):
                                     experiment_db_ctl).open())
         self.el.addAction(open_file_action)
 
+        self.unused_expargs = dict()
+
+        self.exp_manager.update_exparg = self.update_exparg
+        self.experiment_button = QtWidgets.QPushButton(f"Experiment Args to Delete: {len(self.unused_expargs)}")
+        self.experiment_button.setFlat(True)
+        self.experiment_button.setIcon(QtWidgets.QApplication.style().standardIcon(
+            QtWidgets.QStyle.StandardPixmap.SP_MessageBoxWarning))
+        top_widget.addWidget(self.experiment_button, 2, 0, 1, 2)
+        self.experiment_button.setStyleSheet("""
+            QPushButton {
+                color: palette(placeholder-text);
+                margin: 0px;
+                padding: 0px;
+            }
+        """)
+
         self.waiting_panel = WaitingPanel()
         self.stack.addWidget(self.waiting_panel)
         explist_status_sub.add_setmodel_callback(
@@ -290,6 +306,17 @@ class ExplorerDock(QtWidgets.QDockWidget):
             action = getattr(self.exp_manager, action)
             action("repo:" + expname)
 
+    def update_exparg(self):
+        self.unused_expargs = dict()
+        for k, v in self.exp_manager.submission_arguments.items():
+            if k[5:] not in self.explist_model.backing_store:
+                self.unused_expargs[k] = v
+        if self.unused_expargs:
+            self.experiment_button.setText(f"Experiment Args to Delete: {len(self.unused_expargs)}")
+            self.experiment_button.setVisible(True)
+        else:
+            self.experiment_button.setVisible(False)
+
     def set_shortcut(self, nr):
         expname = self._get_selected_expname()
         if expname is not None:
@@ -304,6 +331,7 @@ class ExplorerDock(QtWidgets.QDockWidget):
         else:
             self.stack.setCurrentWidget(self.el_buttons)
             self.waiting_panel.stop()
+            self.update_exparg()
 
     def update_cur_rev(self, cur_rev):
         self.revision.setText(cur_rev)
