@@ -116,6 +116,27 @@ Reconfiguring a Phaser in the Classic configuration to MultiTone DDS is as simpl
 
 Note that :mod:`~artiq.frontend.artiq_flash` does not provide an utility for reverting to Phaser Classic or MIQRO gateware, which should be done through the respective flashing procedures for those variants.
 
+.. _flash_backup:
+
+Flash backup
+-----------------
+
+Recovering and saving the current flash binaries can be done by running: ::
+
+  $ artiq_flash -t <target> backup=<backup_dir_name>
+
+The backup directory is created and contains the following files:
+
+  - top.bin
+  - bootloader.bin
+  - storage.bin
+  - firmware.fbi
+
+The gateware, storage and firmware files are truncated after being read from flash so that their sizes match the actual stored data rather than the complete flash partitions. 
+The bootloader does not contain information from which its exact binary size can be recovered. Therefore, bootloader.bin contains the complete bootloader flash partition.
+
+The resulting backup directory can be used as source directory for later :mod:`~artiq.frontend.artiq_flash` operations.
+
 .. _connecting-uart:
 
 Connecting to the UART log
