@@ -63,8 +63,11 @@ class RoundtripTest(ExperimentCase):
     def test_int64_list(self):
         self.assertRoundtrip([int64(0), int64(1)])
 
+    def test_str_list(self):
+        self.assertRoundtrip(["foo", "bar", "baz"])
+
     def test_mixed_tuple(self):
-        self.assertRoundtrip((False, True, 0x12345678))
+        self.assertRoundtrip((False, True, 0x12345678, "foobar"))
 
     def test_list_tuple(self):
         self.assertRoundtrip(([1, 2], [3, 4]))
