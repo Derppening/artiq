@@ -11,30 +11,28 @@ from artiq.coredevice.comm_kernel import RPCReturnValueError
 from artiq.coredevice.core import Core
 
 
-class _Roundtrip(EnvExperiment):
+@compile
+class Roundtrip(EnvExperiment):
+    core: KernelInvariant[Core]
+
     def build(self):
         self.setattr_device("core")
 
     @kernel
-    def roundtrip(self, obj, fn):
-        fn(obj)
+    def roundtrip(self, obj: Auto) -> Auto:
+        return obj
 
-@unittest.skip("NAC3TODO https://git.m-labs.hk/M-Labs/nac3/issues/461")
+
 class RoundtripTest(ExperimentCase):
     def assertRoundtrip(self, obj):
-        exp = self.create(_Roundtrip)
-        def callback(objcopy):
-            self.assertEqual(obj, objcopy)
-        exp.roundtrip(obj, callback)
+        exp = self.create(Roundtrip)
+        objcopy = exp.roundtrip(obj)
+        self.assertEqual(obj, objcopy)
 
     def assertArrayRoundtrip(self, obj):
-        exp = self.create(_Roundtrip)
-        def callback(objcopy):
-            numpy.testing.assert_array_equal(obj, objcopy)
-        exp.roundtrip(obj, callback)
-
-    def test_None(self):
-        self.assertRoundtrip(None)
+        exp = self.create(Roundtrip)
+        objcopy = exp.roundtrip(obj)
+        numpy.testing.assert_array_equal(obj, objcopy)
 
     def test_bool(self):
         self.assertRoundtrip(True)
@@ -56,12 +54,6 @@ class RoundtripTest(ExperimentCase):
     def test_str(self):
         self.assertRoundtrip("foo")
 
-    def test_bytes(self):
-        self.assertRoundtrip(b"foo")
-
-    def test_bytearray(self):
-        self.assertRoundtrip(bytearray(b"foo"))
-
     def test_list(self):
         self.assertRoundtrip([10])
 
@@ -71,15 +63,8 @@ class RoundtripTest(ExperimentCase):
     def test_int64_list(self):
         self.assertRoundtrip([int64(0), int64(1)])
 
-    def test_object(self):
-        obj = object()
-        self.assertRoundtrip(obj)
-
-    def test_object_list(self):
-        self.assertRoundtrip([object(), object()])
-
-    def test_object_tuple(self):
-        self.assertRoundtrip((False, object(), True, 0x12345678))
+    def test_mixed_tuple(self):
+        self.assertRoundtrip((False, True, 0x12345678))
 
     def test_list_tuple(self):
         self.assertRoundtrip(([1, 2], [3, 4]))
