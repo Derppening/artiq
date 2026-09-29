@@ -684,6 +684,13 @@ class ExperimentManager:
             return self.initialize_submission_arguments(expurl, class_desc["arginfo"],
                                                         class_desc.get("argument_ui", None))
 
+    def delete_argument(self, expurl):
+        try:
+            del self.submission_arguments[expurl]
+        except Exception:
+            logger.warn("Failed to delete experiment arguments for : {}."
+                        .format(expurl), exc_info=1)
+
     def open_experiment(self, expurl):
         if expurl in self.open_experiments:
             dock = self.open_experiments[expurl]
@@ -693,7 +700,10 @@ class ExperimentManager:
             return dock
         try:
             dock = _ExperimentDock(self, expurl)
-        except:
+        except KeyError:
+            logger.warning("Failed to create experiment dock for %s.", expurl, exc_info=True)
+            return
+        except Exception:
             logger.warning("Failed to create experiment dock for %s, "
                            "attempting to reset arguments", expurl,
                            exc_info=True)
