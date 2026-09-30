@@ -514,7 +514,9 @@ class AD9910(Generic[SyncDataT]):
         if self.sync_data.sync_delay_seed >= 0:
             if float(self.sysclk_per_mu) != self.sysclk * self.core.ref_period:
                 raise ValueError("incorrect clock ratio for synchronization")
-        self.core.delay(50. * ms)  # slack
+        # sync_data.init() may read an EEPROM over I2C, which does not advance
+        # the timeline and can take arbitrarily long (e.g. on DRTIO satellites).
+        self.core.break_realtime()
 
         # Set SPI mode
         self.set_cfr1()
