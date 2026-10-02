@@ -12,11 +12,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1784561780,
-        "narHash": "sha256-Uip+vQFtJi25zwzHDyqt/zExlNrCtoZesZMnSD0k/6M=",
+        "lastModified": 1790764873,
+        "narHash": "sha256-OXMmEPPfE/vvBBY5RRs+cABiZiOskCGHE4o7j3MJ/i0=",
         "ref": "refs/heads/master",
-        "rev": "26491e581fad362e0d9579e164a04e98d7c5e5e0",
-        "revCount": 60,
+        "rev": "270ff767bd2e5551e982074c5c1c910b3b5789a6",
+        "revCount": 71,
         "type": "git",
         "url": "https://git.m-labs.hk/M-Labs/artiq-comtools.git"
       },
@@ -70,11 +70,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1790600506,
-        "narHash": "sha256-BFD5fb6apcBjZSqyxXqKovAtWrxl5mk08Sh3gp0QMws=",
+        "lastModified": 1790930297,
+        "narHash": "sha256-zBKX4XTV+LGh1DPdkmpDGoP+OegzH2xuElXAYmL2nUw=",
         "ref": "refs/heads/master",
-        "rev": "dfb7f4040fa81caf37fcf4b18aa5331202f61631",
-        "revCount": 2477,
+        "rev": "c0c90e4096e6d75348b2e07adce63d15fa01181b",
+        "revCount": 2479,
         "type": "git",
         "url": "https://git.m-labs.hk/M-Labs/nac3.git"
       },
@@ -107,12 +107,12 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1789286504,
-        "narHash": "sha256-eiEK7cKZORNEvX0GeF3RtNEF/JXhgf2RqSp3230q13E=",
-        "rev": "ef34387ddd751e1ab8857adf4676492d32eb24ec",
-        "revCount": 1073009,
+        "lastModified": 1789921291,
+        "narHash": "sha256-Ft/BRnIqw1MywFoXydKobjjWmDFgDdYtSpJliE8+yUw=",
+        "rev": "44a91898084f46797b5fac650c7e8c9ac38c43d4",
+        "revCount": 1077143,
         "type": "tarball",
-        "url": "https://api.flakehub.com/f/pinned/DeterminateSystems/nixpkgs-weekly/0.1.1073009%2Brev-ef34387ddd751e1ab8857adf4676492d32eb24ec/01a0c79f-6874-7cc0-a7e0-768a6321134b/source.tar.gz"
+        "url": "https://api.flakehub.com/f/pinned/DeterminateSystems/nixpkgs-weekly/0.1.1077143%2Brev-44a91898084f46797b5fac650c7e8c9ac38c43d4/01a0ebad-51ce-7451-8dd8-3e80d608beae/source.tar.gz"
       },
       "original": {
         "type": "tarball",
