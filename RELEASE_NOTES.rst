@@ -23,6 +23,8 @@ ARTIQ-10 (Unreleased)
 * GUI:
  - Implemented a new `TableValue` argument type for tabular data.
  - Added `Copy image to clipboard` option to right click menu for the `plot_xy.py`, `plot_xy_hist.py`, `plot_hist.py`, and `image.py` applets
+ - A message at the bottom of the explorer dock appears when there are experiments saved that are no longer in the repository. This message can be clicked to open a dialog box that contains the list of experiments not found in the repository and their arguments, which can be deleted by the user.
+ - Added `Saved experiments not in repository` option to the Explorer Dock's right click menu, which opens the dialog box where one can delete saved experiments not found in the repository.
 * `artiq_flash`: a backup command has been added to save the current contents of the flash partitions to a user-defined directory. Gateware, storage and firmware are truncated to their actual data size, while the complete bootloader partition is preserved.
 
 Breaking changes:
