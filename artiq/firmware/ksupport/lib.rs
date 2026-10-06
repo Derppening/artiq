@@ -279,7 +279,7 @@ extern fn cache_get(key: CSlice<u8>) -> *mut List<i32> {
 extern "C-unwind" fn cache_put(key: CSlice<u8>, list: &List<i32>) {
     send(&CachePutRequest {
         key:   str::from_utf8(key.as_ref()).unwrap(),
-        value: list.backing_array(),
+        value: list.get_backing_array(),
         len:   list.inner.len
     });
     recv!(&CachePutReply { succeeded } => {
