@@ -9,7 +9,7 @@ from artiq.language.units import us, ns
 from artiq.coredevice.core import Core
 from artiq.coredevice.kasli_i2c import KasliEEPROM
 from artiq.coredevice.rtio import rtio_output, rtio_input_data
-from artiq.coredevice.spi2 import SPI_END, SPIMaster
+from artiq.coredevice import spi2 as spi
 from artiq.coredevice import ad9910, urukul, sampler
 from artiq.coredevice.ttl import TTLOut
 from artiq.coredevice.urukul import CPLD, STA_PROTO_REV_9
@@ -301,7 +301,7 @@ class SUServo(Generic[SyncDataT]):
     """
 
     core: KernelInvariant[Core]
-    pgia: KernelInvariant[SPIMaster]
+    pgia: KernelInvariant[spi.SPIMaster]
     ddses: KernelInvariant[list[SharedDDS[SyncDataT]]]
     cplds: KernelInvariant[list[CPLD[Auto]]]
     channel: KernelInvariant[int32]
@@ -372,7 +372,7 @@ class SUServo(Generic[SyncDataT]):
         self.core.delay(3.*us)  # pipeline flush
 
         self.pgia.set_config_mu(
-            SAMPLER_SPI_CONFIG | SPI_END,
+            SAMPLER_SPI_CONFIG | spi.SPI_END,
             16, 4, SAMPLER_SPI_CS_PGIA)
 
         io_update_delays = [ 0 for _ in self.cplds ]
