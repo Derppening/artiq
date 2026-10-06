@@ -4,7 +4,8 @@ from artiq.language.core import *
 from artiq.language.units import us, ms
 from artiq.coredevice.core import Core
 from artiq.coredevice.rtio import rtio_output
-from artiq.coredevice.spi2 import SPIMaster, SPI_END, SPI_INPUT
+from artiq.coredevice import spi2 as spi
+
 
 LTC2K_REG_RESET = 0x01  # Reset, power down controls
 LTC2K_REG_CLK   = 0x02  # Clock and DCKO controls
@@ -31,6 +32,8 @@ def volt_to_mu(volt: float, width: int32 = 16) -> int32:
     """
     return round(float(1 << width) * (volt / 2.0)) & ((1 << width) - 1)
 
+B_TRIG_OFFSET = 0
+C_TRIG_OFFSET = 1
 
 @compile
 class Songbird:
@@ -41,7 +44,7 @@ class Songbird:
     :param core_device: Core device name (default: "core").
     """
 
-    bus: KernelInvariant[SPIMaster]
+    bus: KernelInvariant[spi.SPIMaster]
     core: KernelInvariant[Core]
     dds_freq: KernelInvariant[float]
     target_clear_o: KernelInvariant[int32]
@@ -51,7 +54,7 @@ class Songbird:
     spi_config: KernelInvariant[int32]
 
     def __init__(self, dmgr, spi_device, channel, core_device="core"):
-        self.bus: SPIMaster = dmgr.get(spi_device)
+        self.bus: spi.SPIMaster = dmgr.get(spi_device)
         self.core = dmgr.get(core_device)
         if self.core.ref_period == 1.25e-9:
             self.dds_freq = 2.4e9
@@ -63,7 +66,7 @@ class Songbird:
         self.target_reset_o = (channel + 1) << 8
         self.target_trigger_o = (channel + 2) << 8
         self.clear_state = 0
-        self.spi_config = SPI_END
+        self.spi_config = spi.SPI_END
 
     @portable
     def frequency_to_mu(self, frequency: float) -> int32:
@@ -131,7 +134,7 @@ class Songbird:
         :param addr: Register address.
         :return: The 8-bit value read from the register.
         """
-        self.bus.set_config_mu(self.spi_config | SPI_INPUT, 32, 256, 0b0001)
+        self.bus.set_config_mu(self.spi_config | spi.SPI_INPUT, 32, 256, 0b0001)
         self.core.delay(2.0*us)
         self.bus.write((1 << 31) | (addr << 24))
         self.core.delay(2.0*us)
