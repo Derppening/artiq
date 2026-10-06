@@ -175,6 +175,7 @@ class TRF372017:
         if self.use_external_lo:
             # pass the LO output to downstream upconverter
             self.enable_lo_output(True)
+            self.enable_mixer_rf_output(True)
         else:
             self.enable_mixer_rf_output(False)
             self.set_mixer_frequency(2.875 * GHz)
