@@ -17,6 +17,10 @@
             "ports": [7],
             "bank_direction_low": "output",
             "bank_direction_high": "input"
+        },
+        {
+            "type": "songbird",
+            "ports": [8]
         }
     ]
 }

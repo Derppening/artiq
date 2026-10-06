@@ -17,6 +17,7 @@ from artiq.coredevice.grabber import Grabber
 from artiq.coredevice.fastino import Fastino
 from artiq.coredevice.phaser import Phaser
 from artiq.coredevice import shuttler
+from artiq.coredevice import songbird
 
 
 @compile
@@ -41,6 +42,7 @@ class NAC3Devices(EnvExperiment):
     phaser0: KernelInvariant[Phaser]
     shuttler0_dcbias0: KernelInvariant[shuttler.DCBias]
     shuttler0_dds0: KernelInvariant[shuttler.DDS]
+    songbird0_dds0: KernelInvariant[songbird.DDS]
 
     def build(self):
         self.setattr_device("core")
@@ -63,6 +65,7 @@ class NAC3Devices(EnvExperiment):
         self.setattr_device("phaser0")
         self.setattr_device("shuttler0_dcbias0")
         self.setattr_device("shuttler0_dds0")
+        self.setattr_device("songbird0_dds0")
 
     @kernel
     def run(self):
