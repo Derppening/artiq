@@ -7,18 +7,18 @@ from artiq.language.units import us
 from numpy import int32
 
 from artiq.coredevice.core import Core
-from artiq.coredevice.spi2 import *
+from artiq.coredevice import spi2 as spi
 
 
 SPI_CONFIG = (
-    0 * SPI_OFFLINE
-    | 0 * SPI_END
-    | 0 * SPI_INPUT
-    | 1 * SPI_CS_POLARITY
-    | 0 * SPI_CLK_POLARITY
-    | 0 * SPI_CLK_PHASE
-    | 0 * SPI_LSB_FIRST
-    | 0 * SPI_HALF_DUPLEX
+    0 * spi.SPI_OFFLINE
+    | 0 * spi.SPI_END
+    | 0 * spi.SPI_INPUT
+    | 1 * spi.SPI_CS_POLARITY
+    | 0 * spi.SPI_CLK_POLARITY
+    | 0 * spi.SPI_CLK_PHASE
+    | 0 * spi.SPI_LSB_FIRST
+    | 0 * spi.SPI_HALF_DUPLEX
 )
 
 # SPI clock write and read dividers
@@ -50,7 +50,7 @@ class Mirny:
     :param core_device: Core device name (default: "core")
     """
     core: KernelInvariant[Core]
-    bus: KernelInvariant[SPIMaster]
+    bus: KernelInvariant[spi.SPIMaster]
     refclk: KernelInvariant[float]
     clk_sel_hw_rev: Kernel[list[int32]]
     hw_rev: Kernel[int32]
@@ -91,7 +91,7 @@ class Mirny:
     def read_reg(self, addr: int32) -> int32:
         """Read a register."""
         self.bus.set_config_mu(
-            SPI_CONFIG | SPI_INPUT | SPI_END, 24, SPIT_RD, SPI_CS
+            SPI_CONFIG | spi.SPI_INPUT | spi.SPI_END, 24, SPIT_RD, SPI_CS
         )
         self.bus.write((addr << 25))
         return self.bus.read() & 0xFFFF
@@ -99,7 +99,7 @@ class Mirny:
     @kernel
     def write_reg(self, addr: int32, data: int32):
         """Write a register."""
-        self.bus.set_config_mu(SPI_CONFIG | SPI_END, 24, SPIT_WR, SPI_CS)
+        self.bus.set_config_mu(SPI_CONFIG | spi.SPI_END, 24, SPIT_WR, SPI_CS)
         self.bus.write((addr << 25) | WE | ((data & 0xFFFF) << 8))
 
     @kernel
@@ -116,7 +116,7 @@ class Mirny:
         # See the following commit on SPI gateware driver characteristics.
         # https://git.m-labs.hk/M-Labs/misoc/commit/20db6c87b4a1952ee0d3a1462defa838efec5e9e
         self.bus.set_config_mu(
-            SPI_CONFIG | SPI_OFFLINE | SPI_END,
+            SPI_CONFIG | spi.SPI_OFFLINE | spi.SPI_END,
             1,              # minimum
             SPIT_WR,
             SPI_CS
@@ -167,7 +167,7 @@ class Mirny:
 
         :param att: Attenuation setting, 8-bit digital.
         """
-        self.bus.set_config_mu(SPI_CONFIG | SPI_END, 16, SPIT_WR, SPI_CS)
+        self.bus.set_config_mu(SPI_CONFIG | spi.SPI_END, 16, SPIT_WR, SPI_CS)
         self.bus.write(((channel | 8) << 25) | (att << 16))
 
     @kernel
@@ -190,7 +190,7 @@ class Mirny:
         """Perform SPI write to a prefixed address."""
         self.bus.set_config_mu(SPI_CONFIG, 8, SPIT_WR, SPI_CS)
         self.bus.write(addr << 25)
-        self.bus.set_config_mu(SPI_CONFIG | SPI_END, length, ext_div, SPI_CS)
+        self.bus.set_config_mu(SPI_CONFIG | spi.SPI_END, length, ext_div, SPI_CS)
         if length < 32:
             data <<= 32 - length
         self.bus.write(data)
