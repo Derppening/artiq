@@ -1,8 +1,9 @@
-from numpy import int32
+from numpy import int32, uint32
 
+from artiq.coredevice.core import Core
 from artiq.coredevice import spi2 as spi
+
 from artiq.language.core import *
-from artiq.language.types import *
 from artiq.language.units import us
 
 
@@ -19,6 +20,7 @@ ATT_SPI_CONFIG = (
 )
 
 
+@compile
 class HMC542B:
     """Attenuator HMC542B driver
 
@@ -26,44 +28,45 @@ class HMC542B:
     :param core_device: Core device name (default: "core").
     """
 
-    kernel_invariants = {"core", "bus"}
+    core: KernelInvariant[Core]
+    bus: KernelInvariant[spi.SPIMaster]
 
     def __init__(self, dmgr, spi_device, core_device="core"):
         self.core = dmgr.get(core_device)
         self.bus = dmgr.get(spi_device)
 
-    @portable(flags={"fast-math"})
-    def att_to_mu(self, att):
+    @portable
+    def att_to_mu(self, att: float) -> uint32:
         """Convert a digital step attenuator setting in dB to machine units.
 
         :param att: Attenuation in dB.
         :return: Digital attenuation setting in machine units.
         """
-        mu = int32(0xFF) - int32(round(att * 8))
+        mu = 0xFF - int32(round(att * 8.0))
         if mu < 0 or mu > 0xFF:
             raise ValueError("Invalid Phaser attenuation!")
-        return mu
+        return uint32(mu)
 
-    @portable(flags={"fast-math"})
-    def mu_to_att(self, att_mu) -> TFloat:
+    @portable
+    def mu_to_att(self, att_mu: uint32) -> float:
         """Convert a digital step attenuator setting in machine units to dB.
 
         :param att_mu: Digital attenuation setting in machine units.
         :return: Attenuation in dB.
         """
-        return (0xFF - att_mu) / 8
+        return (0xFF - int32(att_mu)) / 8
 
     @kernel
-    def set_att_mu(self, att_mu):
+    def set_att_mu(self, att_mu: uint32):
         """Set digital step attenuator in machine units.
 
         :param att_mu: Digital attenuation setting in machine units.
         """
         self.bus.set_config_mu(ATT_SPI_CONFIG, 8, ATT_SPI_DIV, 1)
-        self.bus.write(att_mu << 24)
+        self.bus.write(int32(att_mu << 24))
 
     @kernel
-    def get_att_mu(self) -> TInt32:
+    def get_att_mu(self) -> uint32:
         """Get digital step attenuator in machine units.
 
         :return: Digital attenuation setting in machine units.
@@ -71,17 +74,17 @@ class HMC542B:
         # shift in zeros to get current value
         self.bus.set_config_mu(ATT_SPI_CONFIG | spi.SPI_INPUT, 8, ATT_SPI_DIV, 1)
         self.bus.write(0)
-        att_mu = self.bus.read() & 0xFF
-        delay(40.0 * us)
+        att_mu = uint32(self.bus.read()) & uint32(0xFF)
+        self.core.delay(40.0 * us)
 
         # shift it back
         self.bus.set_config_mu(ATT_SPI_CONFIG, 8, ATT_SPI_DIV, 1)
-        self.bus.write(att_mu << 24)
-        delay(40.0 * us)
+        self.bus.write(int32(att_mu << 24))
+        self.core.delay(40.0 * us)
         return att_mu
 
     @kernel
-    def set_att(self, att):
+    def set_att(self, att: float):
         """Set digital step attenuator in SI units.
 
         :param att: Attenuation in dB.
@@ -89,7 +92,7 @@ class HMC542B:
         self.set_att_mu(self.att_to_mu(att))
 
     @kernel
-    def get_att(self):
+    def get_att(self) -> float:
         """Get digital step attenuator in SI units.
 
         :return: Attenuation in dB.
