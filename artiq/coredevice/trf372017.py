@@ -1,9 +1,10 @@
-from numpy import int32, int64
+from numpy import int32, int64, uint32
 
+from artiq.coredevice.core import Core
 from artiq.coredevice import spi2 as spi
 from artiq.coredevice.trf372017_reg import TRF372017 as TRF372017Reg
+
 from artiq.language.core import *
-from artiq.language.types import *
 from artiq.language.units import us, GHz, MHz
 
 TRF_MAX_MIXER_FREQ = 4.8 * GHz
@@ -29,8 +30,8 @@ TRF_SPI_CONFIG = (
 
 @portable
 def calculate_pll(
-    f_refclk: TFloat, f_mixer: TFloat
-) -> TTuple([TInt32, TInt32, TInt32, TInt32, TInt32, TInt32]):
+    f_refclk: float, f_mixer: float
+) -> tuple[uint32, uint32, uint32, uint32, uint32, uint32]:
     """Calculate fractional PLL parameters with the best phase noise performance
 
     ``f_rf = (1 / tx_div_sel) * (f_refclk / r_div) * pll_div_sel * (n_int + n_frac / 2**25)``
@@ -42,31 +43,34 @@ def calculate_pll(
     if f_mixer > TRF_MAX_MIXER_FREQ or f_mixer < TRF_MIN_MIXER_FREQ:
         raise ValueError("Requested frequency out of range")
 
-    tx_div_sel = 0
+    tx_div_sel = uint32(0)
     f_vco = f_mixer
     while f_vco < TRF_MIN_VCO_FREQ:
-        f_vco *= 2
-        tx_div_sel += 1
+        f_vco *= 2.0
+        tx_div_sel += uint32(1)
 
     # SLWS224E Section 7.3.2.1 c prescaler settings :
     # - 23 <= NINT < 75 when prescaler = 4/5
     # - 75 <= NINT < 2**16 when prescaler = 8/9
-    for n_min, n_max, prescaler in [(23, 75, 4), (75, 1 << 16, 8)]:
+    for n_min, n_max, prescaler in [
+        (uint32(23), uint32(75), uint32(4)),
+        (uint32(75), uint32(1 << 16), uint32(8)),
+    ]:
         # To have the best phaser noise performance. The f_pfd need to run as high as possible - SLWS224E Section 7.3.2.1 b
         # And a PLL config with the highest possible f_pm will have the higest f_pfd. As f_pfd = f_vco / (pll_div * n) = f_pm / n.
-        pres_sel = 0 if prescaler == 4 else 1
-        pll_div_sel = 0
+        pres_sel = uint32(0) if prescaler == uint32(4) else uint32(1)
+        pll_div_sel = uint32(0)
         f_pm = f_vco
-        while (f_pm / prescaler) > TRF_MAX_N_FREQ or f_pm > TRF_MAX_PM_FREQ:
-            f_pm /= 2
-            pll_div_sel += 1
+        while (f_pm / float(prescaler)) > TRF_MAX_N_FREQ or f_pm > TRF_MAX_PM_FREQ:
+            f_pm /= 2.0
+            pll_div_sel += uint32(1)
 
-        r_div = 1
+        r_div = uint32(1)
         f_pfd = f_refclk
         n_int, n_frac = calculate_n_divider(f_pm, f_pfd)
         while n_int < n_min or f_pfd > TRF_MAX_PFD_FREQ:
-            r_div += 1
-            f_pfd = f_refclk / r_div
+            r_div += uint32(1)
+            f_pfd = f_refclk / float(r_div)
             n_int, n_frac = calculate_n_divider(f_pm, f_pfd)
 
         if n_int < n_max:
@@ -75,7 +79,7 @@ def calculate_pll(
 
 
 @portable
-def calculate_n_divider(f_pm, f_pfd) -> TTuple([TInt32, TInt32]):
+def calculate_n_divider(f_pm: float, f_pfd: float) -> tuple[uint32, uint32]:
     """Calculate fractional PLL parameters such that
 
     ``f_pm = f_pfd * (n_int + n_frac/2**25)``
@@ -84,29 +88,30 @@ def calculate_n_divider(f_pm, f_pfd) -> TTuple([TInt32, TInt32]):
     :param f_pfd: Phase frequency detector frequency
     :return: (``n_int``, ``n_frac``)
     """
-    return int32(f_pm // f_pfd), int32(((f_pm / f_pfd) % 1.0) * float(1 << 25))
+    return uint32(f_pm // f_pfd), uint32(((f_pm / f_pfd) % 1.0) * float(1 << 25))
 
 
 @portable
-def calculate_cal_clk_sel(f_refclk, r_div) -> TInt32:
+def calculate_cal_clk_sel(f_refclk: float, r_div: uint32) -> uint32:
     """Calculate and return cal_clk_sel, the 4-bit VCO calibration clock factor.
 
     :param f_refclk: Reference clock frequency in Hz
     :param r_div: 13-bit reference divider
     :return: ``cal_clk_sel``
     """
-    f_pfd = f_refclk / r_div
-    cal_clk_sel = 0b1000  # x1
+    f_pfd = f_refclk / float(r_div)
+    cal_clk_sel = uint32(0b1000)  # x1
     if f_pfd <= TRF_MAX_CAL_FREQ:
         return cal_clk_sel
     else:
         f_cal = f_pfd
         while f_cal > TRF_MAX_CAL_FREQ:
-            f_cal /= 2
-            cal_clk_sel += 1
+            f_cal /= 2.0
+            cal_clk_sel += uint32(1)
     return cal_clk_sel
 
 
+@compile
 class TRF372017:
     """IQ Upconverter TRF372017 driver
 
@@ -116,7 +121,12 @@ class TRF372017:
     :param core_device: Core device name (default: "core").
     """
 
-    kernel_invariants = {"core", "bus", "refclk", "use_external_lo", "init_mmap"}
+    core: KernelInvariant[Core]
+    bus: KernelInvariant[spi.SPIMaster]
+    refclk: KernelInvariant[float]
+    use_external_lo: KernelInvariant[bool]
+    init_mmap: KernelInvariant[list[uint32]]
+    vco_calibration_duration_mu: Kernel[int64]
 
     def __init__(self, dmgr, spi_device, refclk, use_external_lo, core_device="core"):
         self.core = dmgr.get(core_device)
@@ -157,10 +167,10 @@ class TRF372017:
         """
         if self.read(0x00) & 0x60 != 0x60:
             raise ValueError("TRF372017 chip id mismatch")
-        delay(40.0 * us)
+        self.core.delay(40.0 * us)
 
         for data in self.init_mmap:
-            self.write(data)
+            self.write(int32(data))
 
         if self.use_external_lo:
             # pass the LO output to downstream upconverter
@@ -171,7 +181,7 @@ class TRF372017:
             self.enable_mixer_rf_output(True)
 
     @kernel
-    def read(self, addr) -> TInt32:
+    def read(self, addr: int32) -> int32:
         # Write to register 0
         self.bus.set_config_mu(
             TRF_SPI_CONFIG | spi.SPI_END,
@@ -179,7 +189,8 @@ class TRF372017:
             TRF_SPI_DIV,
             1,
         )
-        self.bus.write(0x80000008 | (addr & 0b111) << 28)
+        read_op = uint32(0x80000008)
+        self.bus.write(int32(read_op) | (addr & 0b111) << 28)
 
         # Hold CS high for one cycle
         self.bus.set_config_mu(
@@ -201,7 +212,7 @@ class TRF372017:
         return self.bus.read()
 
     @kernel
-    def write(self, data):
+    def write(self, data: int32):
         self.bus.set_config_mu(
             TRF_SPI_CONFIG | spi.SPI_END,
             32,
@@ -217,23 +228,23 @@ class TRF372017:
         .. warning:: RF and LO outputs must be disabled during VCO calibration via :meth:`enable_mixer_rf_output` and :meth:`enable_lo_output`.
         """
         reg_0x02 = self.read(0x02)
-        delay(40.0 * us)
+        self.core.delay(40.0 * us)
         # The bit will reset automatically, no need to write the original value again - SLWS224E Table 16
         self.write(reg_0x02 | (1 << 31))
         delay_mu(self.vco_calibration_duration_mu)
 
         if self.read(0x00) & 0x1000 == 0x1000:
             raise ValueError("TRF372017 VCO calibration error")
-        delay(40.0 * us)
+        self.core.delay(40.0 * us)
 
     @kernel
-    def enable_mixer_rf_output(self, output_enable):
+    def enable_mixer_rf_output(self, output_enable: bool):
         """Enable/disable mixer RF output
 
         :param output_enable: Enable mixer RF output when set to True
         """
         reg_0x04 = self.read(0x04)
-        delay(40.0 * us)
+        self.core.delay(40.0 * us)
         if output_enable:
             reg_0x04 &= ~(1 << 14)
         else:
@@ -242,13 +253,13 @@ class TRF372017:
         self.write(reg_0x04)
 
     @kernel
-    def enable_lo_output(self, output_enable):
+    def enable_lo_output(self, output_enable: bool):
         """Enable/disable LO output
 
         :param output_enable: Enable LO output when set to True
         """
         reg_0x04 = self.read(0x04)
-        delay(40.0 * us)
+        self.core.delay(40.0 * us)
         if output_enable:
             reg_0x04 &= ~((1 << 12) | (1 << 13))
         else:
@@ -257,7 +268,7 @@ class TRF372017:
         self.write(reg_0x04)
 
     @kernel
-    def set_mixer_frequency(self, frequency):
+    def set_mixer_frequency(self, frequency: float):
         """Calculate PLL parameter, set mixer frequency and calibrate VCO
 
         .. warning:: Before calling this method, RF and LO outputs must be disabled via :meth:`enable_mixer_rf_output` and :meth:`enable_lo_output` due to VCO calibration.
@@ -269,7 +280,7 @@ class TRF372017:
         )
         cal_clk_sel = calculate_cal_clk_sel(self.refclk, r_div)
         self.update_vco_calibration_duration_mu(r_div, cal_clk_sel)
-        delay(100.0 * us)  # slack
+        self.core.delay(100.0 * us)  # slack
 
         self.set_cal_clk_sel(cal_clk_sel)
         self.set_pll_registers(r_div, pres_sel, n_int, n_frac, pll_div_sel, tx_div_sel)
@@ -277,18 +288,24 @@ class TRF372017:
         self.calibrate_vco()
 
     @kernel
-    def set_cal_clk_sel(self, cal_clk_sel):
+    def set_cal_clk_sel(self, cal_clk_sel: uint32):
         """Write the 4-bit VCO calibration clock factor register
 
         :param cal_clk_sel: 4-bit VCO calibration clock factor
         """
         reg_0x01 = self.read(0x01)
-        delay(40.0 * us)
-        self.write(reg_0x01 & ~(0xF << 27) | cal_clk_sel << 27)
+        self.core.delay(40.0 * us)
+        self.write(reg_0x01 & ~(0xF << 27) | int32(cal_clk_sel) << 27)
 
     @kernel
     def set_pll_registers(
-        self, r_div, prsc_sel, n_int, n_frac, pll_div_sel, tx_div_sel
+        self,
+        r_div: uint32,
+        prsc_sel: uint32,
+        n_int: uint32,
+        n_frac: uint32,
+        pll_div_sel: uint32,
+        tx_div_sel: uint32,
     ):
         """Write the PLL parameter to registers.
 
@@ -300,28 +317,28 @@ class TRF372017:
         :param n_tx_div_sel: 2-bit tx divider
         """
         reg_0x01 = self.read(0x01)
-        delay(40.0 * us)
-        self.write(reg_0x01 & ~(0x1FFF << 5) | r_div << 5)
+        self.core.delay(40.0 * us)
+        self.write(reg_0x01 & ~(0x1FFF << 5) | int32(r_div) << 5)
 
         reg_0x02 = self.read(0x02)
-        delay(40.0 * us)
+        self.core.delay(40.0 * us)
         self.write(
             reg_0x02 & ~(0xFFFF << 5 | 0b11 << 21 | 0b1 << 23)
-            | n_int << 5
-            | pll_div_sel << 21
-            | prsc_sel << 23
+            | int32(n_int) << 5
+            | int32(pll_div_sel) << 21
+            | int32(prsc_sel) << 23
         )
 
         reg_0x03 = self.read(0x03)
-        delay(40.0 * us)
-        self.write(reg_0x03 & ~(0x1FFFFFF << 5) | n_frac << 5)
+        self.core.delay(40.0 * us)
+        self.write(reg_0x03 & ~(0x1FFFFFF << 5) | int32(n_frac) << 5)
 
         reg_0x06 = self.read(0x06)
-        delay(40.0 * us)
-        self.write(reg_0x06 & ~(0xF << 24) | tx_div_sel << 24)
+        self.core.delay(40.0 * us)
+        self.write(reg_0x06 & ~(0xF << 24) | int32(tx_div_sel) << 24)
 
     @portable
-    def update_vco_calibration_duration_mu(self, r_div, cal_clk_sel):
+    def update_vco_calibration_duration_mu(self, r_div: uint32, cal_clk_sel: uint32):
         """Calculate and set the VCO calibration duration (:attr:`vco_calibration_duration_mu`).
 
         This method updates the VCO calibration duration which is used
@@ -332,12 +349,12 @@ class TRF372017:
         :param r_div: 13-bit reference divider
         :param cal_clk_sel: 4-bit VCO calibration clock factor
         """
-        f_pfd = self.refclk / r_div
+        f_pfd = self.refclk / float(r_div)
         # cal_clk_sel is ones' complement
-        if cal_clk_sel & 0b1000 == 0b1000:
-            f_cal = f_pfd / (1 << (cal_clk_sel & 0b111))
+        if cal_clk_sel & uint32(0b1000) == uint32(0b1000):
+            f_cal = f_pfd / float(1 << (cal_clk_sel & uint32(0b111)))
         else:
-            f_cal = f_pfd * (1 << (cal_clk_sel ^ 0b111))
+            f_cal = f_pfd * float(1 << (cal_clk_sel ^ uint32(0b111)))
 
         # Max VCO calibration time = 46 cal_clk cycle - SLWS224E Table 3
-        self.vco_calibration_duration_mu = self.core.seconds_to_mu(46 / f_cal)
+        self.vco_calibration_duration_mu = self.core.seconds_to_mu(46.0 / f_cal)
