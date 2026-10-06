@@ -3,7 +3,7 @@ from numpy import int32, int64
 from artiq.language.core import compile, Kernel, KernelInvariant, kernel, portable, Option, none
 from artiq.coredevice.rtio import rtio_output, rtio_input_data
 from artiq.coredevice.core import Core
-from artiq.coredevice.spi2 import *
+from artiq.coredevice import spi2 as spi
 from artiq.language.units import us
 
 
@@ -318,15 +318,15 @@ class Trigger:
         rtio_output(self.target_o, trig_out)
 
 
-RELAY_SPI_CONFIG = (0*SPI_OFFLINE | 1*SPI_END |
-                    0*SPI_INPUT | 0*SPI_CS_POLARITY |
-                    0*SPI_CLK_POLARITY | 0*SPI_CLK_PHASE |
-                    0*SPI_LSB_FIRST | 0*SPI_HALF_DUPLEX)
+RELAY_SPI_CONFIG = (0*spi.SPI_OFFLINE | 1*spi.SPI_END |
+                    0*spi.SPI_INPUT | 0*spi.SPI_CS_POLARITY |
+                    0*spi.SPI_CLK_POLARITY | 0*spi.SPI_CLK_PHASE |
+                    0*spi.SPI_LSB_FIRST | 0*spi.SPI_HALF_DUPLEX)
 
-ADC_SPI_CONFIG = (0*SPI_OFFLINE | 0*SPI_END |
-                  0*SPI_INPUT | 0*SPI_CS_POLARITY |
-                  1*SPI_CLK_POLARITY | 1*SPI_CLK_PHASE |
-                  0*SPI_LSB_FIRST | 0*SPI_HALF_DUPLEX)
+ADC_SPI_CONFIG = (0*spi.SPI_OFFLINE | 0*spi.SPI_END |
+                  0*spi.SPI_INPUT | 0*spi.SPI_CS_POLARITY |
+                  1*spi.SPI_CLK_POLARITY | 1*spi.SPI_CLK_PHASE |
+                  0*spi.SPI_LSB_FIRST | 0*spi.SPI_HALF_DUPLEX)
 
 # SPI clock write and read dividers
 # CS should assert at least 9.5 ns after clk pulse
@@ -365,7 +365,7 @@ class Relay:
     :param core_device: Core device name.
     """
     core: KernelInvariant[Core]
-    bus: KernelInvariant[SPIMaster]
+    bus: KernelInvariant[spi.SPIMaster]
 
     def __init__(self, dmgr, spi_device, core_device="core"):
         self.core = dmgr.get(core_device)
@@ -403,7 +403,7 @@ class ADC:
     :param core_device: Core device name.
     """
     core: KernelInvariant[Core]
-    bus: KernelInvariant[SPIMaster]
+    bus: KernelInvariant[spi.SPIMaster]
 
     def __init__(self, dmgr, spi_device, core_device="core"):
         self.core = dmgr.get(core_device)
@@ -435,7 +435,7 @@ class ADC:
         self.bus.write(-1)
         self.bus.write(-1)
         self.bus.set_config_mu(
-            ADC_SPI_CONFIG | SPI_END, 32, SPIT_ADC_WR, CS_ADC)
+            ADC_SPI_CONFIG | spi.SPI_END, 32, SPIT_ADC_WR, CS_ADC)
         self.bus.write(-1)
 
     @kernel
@@ -446,7 +446,7 @@ class ADC:
         :return: Read-back register content.
         """
         self.bus.set_config_mu(
-            ADC_SPI_CONFIG | SPI_END | SPI_INPUT,
+            ADC_SPI_CONFIG | spi.SPI_END | spi.SPI_INPUT,
             16, SPIT_ADC_RD, CS_ADC)
         self.bus.write((addr | 0x40) << 24)
         return self.bus.read() & 0xff
@@ -459,7 +459,7 @@ class ADC:
         :return: Read-back register content.
         """
         self.bus.set_config_mu(
-            ADC_SPI_CONFIG | SPI_END | SPI_INPUT,
+            ADC_SPI_CONFIG | spi.SPI_END | spi.SPI_INPUT,
             24, SPIT_ADC_RD, CS_ADC)
         self.bus.write((addr | 0x40) << 24)
         return self.bus.read() & 0xffff
@@ -472,7 +472,7 @@ class ADC:
         :return: Read-back register content.
         """
         self.bus.set_config_mu(
-            ADC_SPI_CONFIG | SPI_END | SPI_INPUT,
+            ADC_SPI_CONFIG | spi.SPI_END | spi.SPI_INPUT,
             32, SPIT_ADC_RD, CS_ADC)
         self.bus.write((addr | 0x40) << 24)
         return self.bus.read() & 0xffffff
@@ -485,7 +485,7 @@ class ADC:
         :param data: Data to be written.
         """
         self.bus.set_config_mu(
-            ADC_SPI_CONFIG | SPI_END, 16, SPIT_ADC_WR, CS_ADC)
+            ADC_SPI_CONFIG | spi.SPI_END, 16, SPIT_ADC_WR, CS_ADC)
         self.bus.write(addr << 24 | (data & 0xff) << 16)
 
     @kernel
@@ -496,7 +496,7 @@ class ADC:
         :param data: Data to be written.
         """
         self.bus.set_config_mu(
-            ADC_SPI_CONFIG | SPI_END, 24, SPIT_ADC_WR, CS_ADC)
+            ADC_SPI_CONFIG | spi.SPI_END, 24, SPIT_ADC_WR, CS_ADC)
         self.bus.write(addr << 24 | (data & 0xffff) << 8)
 
     @kernel
@@ -507,7 +507,7 @@ class ADC:
         :param data: Data to be written.
         """
         self.bus.set_config_mu(
-            ADC_SPI_CONFIG | SPI_END, 32, SPIT_ADC_WR, CS_ADC)
+            ADC_SPI_CONFIG | spi.SPI_END, 32, SPIT_ADC_WR, CS_ADC)
         self.bus.write(addr << 24 | (data & 0xffffff))
 
     @kernel
