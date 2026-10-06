@@ -4,14 +4,14 @@ from artiq.language.core import compile, kernel, portable, Kernel, KernelInvaria
 from artiq.language.units import ns
 
 from artiq.coredevice.core import Core
-from artiq.coredevice.spi2 import *
+from artiq.coredevice import spi2 as spi
 from artiq.coredevice.ttl import TTLOut
 
 
-SPI_CONFIG = (0*SPI_OFFLINE | 0*SPI_END |
-              0*SPI_INPUT | 0*SPI_CS_POLARITY |
-              0*SPI_CLK_POLARITY | 0*SPI_CLK_PHASE |
-              0*SPI_LSB_FIRST | 0*SPI_HALF_DUPLEX)
+SPI_CONFIG = (0*spi.SPI_OFFLINE | 0*spi.SPI_END |
+              0*spi.SPI_INPUT | 0*spi.SPI_CS_POLARITY |
+              0*spi.SPI_CLK_POLARITY | 0*spi.SPI_CLK_PHASE |
+              0*spi.SPI_LSB_FIRST | 0*spi.SPI_HALF_DUPLEX)
 
 
 SPI_CS_ADC = 0  # no CS, SPI_END does not matter, framing is done with CNV
@@ -60,8 +60,8 @@ class Sampler:
     :param core_device: Core device name
     """
     core: KernelInvariant[Core]
-    bus_adc: KernelInvariant[SPIMaster]
-    bus_pgia: KernelInvariant[SPIMaster]
+    bus_adc: KernelInvariant[spi.SPIMaster]
+    bus_pgia: KernelInvariant[spi.SPIMaster]
     cnv: KernelInvariant[TTLOut]
     div: KernelInvariant[int32]
     gains: Kernel[int32]
@@ -89,9 +89,9 @@ class Sampler:
 
         Sets up SPI channels.
         """
-        self.bus_adc.set_config_mu(SPI_CONFIG | SPI_INPUT | SPI_END,
+        self.bus_adc.set_config_mu(SPI_CONFIG | spi.SPI_INPUT | spi.SPI_END,
                                    32, self.div, SPI_CS_ADC)
-        self.bus_pgia.set_config_mu(SPI_CONFIG | SPI_END,
+        self.bus_pgia.set_config_mu(SPI_CONFIG | spi.SPI_END,
                                     16, self.div, SPI_CS_PGIA)
 
     @kernel
@@ -116,10 +116,10 @@ class Sampler:
 
         :return: The PGIA gain settings in machine units.
         """
-        self.bus_pgia.set_config_mu(SPI_CONFIG | SPI_END | SPI_INPUT,
+        self.bus_pgia.set_config_mu(SPI_CONFIG | spi.SPI_END | spi.SPI_INPUT,
                                     16, self.div, SPI_CS_PGIA)
         self.bus_pgia.write(self.gains << 16)
-        self.bus_pgia.set_config_mu(SPI_CONFIG | SPI_END,
+        self.bus_pgia.set_config_mu(SPI_CONFIG | spi.SPI_END,
                                     16, self.div, SPI_CS_PGIA)
         self.gains = self.bus_pgia.read() & 0xffff
         return self.gains
