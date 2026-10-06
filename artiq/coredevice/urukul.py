@@ -7,19 +7,19 @@ from artiq.language.core import *
 from artiq.language.units import us, ms
 
 from artiq.coredevice.core import Core
-from artiq.coredevice.spi2 import *
+from artiq.coredevice import spi2 as spi
 from artiq.coredevice.ttl import TTLOut, TTLClockGen
 
 
 SPI_CONFIG = (
-    0 * SPI_OFFLINE
-    | 0 * SPI_END
-    | 0 * SPI_INPUT
-    | 1 * SPI_CS_POLARITY
-    | 0 * SPI_CLK_POLARITY
-    | 0 * SPI_CLK_PHASE
-    | 0 * SPI_LSB_FIRST
-    | 0 * SPI_HALF_DUPLEX
+    0 * spi.SPI_OFFLINE
+    | 0 * spi.SPI_END
+    | 0 * spi.SPI_INPUT
+    | 1 * spi.SPI_CS_POLARITY
+    | 0 * spi.SPI_CLK_POLARITY
+    | 0 * spi.SPI_CLK_PHASE
+    | 0 * spi.SPI_LSB_FIRST
+    | 0 * spi.SPI_HALF_DUPLEX
 )
 
 # SPI clock write and read dividers
@@ -402,7 +402,7 @@ class ProtoRev8(CPLDVersion):
 
         :param cfg: 24-bit data to be written. Will be stored at :attr:`cfg_reg`.
         """
-        self.cpld.bus.set_config_mu(SPI_CONFIG | SPI_END, 24, SPIT_CFG_WR, CS_CFG)
+        self.cpld.bus.set_config_mu(SPI_CONFIG | spi.SPI_END, 24, SPIT_CFG_WR, CS_CFG)
         self.cpld.bus.write(int32(cfg) << 8)
         self.cpld.cfg_reg = int64(cfg)
 
@@ -420,7 +420,7 @@ class ProtoRev8(CPLDVersion):
         :return: The status register value.
         """
         self.cpld.bus.set_config_mu(
-            SPI_CONFIG | SPI_END | SPI_INPUT, 24, SPIT_CFG_RD, CS_CFG
+            SPI_CONFIG | spi.SPI_END | spi.SPI_INPUT, 24, SPIT_CFG_RD, CS_CFG
         )
         self.cpld.bus.write(int32(self.cpld.cfg_reg << 8))
         return self.cpld.bus.read()
@@ -639,7 +639,7 @@ class ProtoRev9(CPLDVersion):
         """
         self.cpld.bus.set_config_mu(SPI_CONFIG, 24, SPIT_CFG_WR, CS_CFG)
         self.cpld.bus.write((int32(cfg >> 28) & 0xFFFFFF) << 8)
-        self.cpld.bus.set_config_mu(SPI_CONFIG | SPI_END, 28, SPIT_CFG_WR, CS_CFG)
+        self.cpld.bus.set_config_mu(SPI_CONFIG | spi.SPI_END, 28, SPIT_CFG_WR, CS_CFG)
         self.cpld.bus.write((int32(cfg) & 0xFFFFFFF) << 4)
         self.cpld.cfg_reg = cfg
 
@@ -660,7 +660,7 @@ class ProtoRev9(CPLDVersion):
         self.cpld.bus.set_config_mu(SPI_CONFIG, 24, SPIT_CFG_WR, CS_CFG)
         self.cpld.bus.write((int32((self.cpld.cfg_reg >> 28) & int64(0xFFFFFF)) << 8))
         self.cpld.bus.set_config_mu(
-            SPI_CONFIG | SPI_END | SPI_INPUT, 28, SPIT_CFG_RD, CS_CFG
+            SPI_CONFIG | spi.SPI_END | spi.SPI_INPUT, 28, SPIT_CFG_RD, CS_CFG
         )
         self.cpld.bus.write(int32((self.cpld.cfg_reg & int64(0xFFFFFFF)) << 4))
         return self.cpld.bus.read()
@@ -884,7 +884,7 @@ class CPLD(Generic[V]):
 
     core: KernelInvariant[Core]
     refclk: KernelInvariant[float]
-    bus: KernelInvariant[SPIMaster]
+    bus: KernelInvariant[spi.SPIMaster]
     io_update: KernelInvariant[Option[TTLOut]]
     clk_div: KernelInvariant[int32]
     dds_reset: KernelInvariant[Option[TTLOut]]
@@ -1125,7 +1125,7 @@ class CPLD(Generic[V]):
 
         :param att_reg: Attenuator setting string (32-bit)
         """
-        self.bus.set_config_mu(SPI_CONFIG | SPI_END, 32, SPIT_ATT_WR, CS_ATT)
+        self.bus.set_config_mu(SPI_CONFIG | spi.SPI_END, 32, SPIT_ATT_WR, CS_ATT)
         self.bus.write(att_reg)
         self.att_reg = att_reg
 
@@ -1154,9 +1154,9 @@ class CPLD(Generic[V]):
 
         :return: 32-bit attenuator settings
         """
-        self.bus.set_config_mu(SPI_CONFIG | SPI_INPUT, 32, SPIT_ATT_RD, CS_ATT)
+        self.bus.set_config_mu(SPI_CONFIG | spi.SPI_INPUT, 32, SPIT_ATT_RD, CS_ATT)
         self.bus.write(0)  # shift in zeros, shift out current value
-        self.bus.set_config_mu(SPI_CONFIG | SPI_END, 32, SPIT_ATT_WR, CS_ATT)
+        self.bus.set_config_mu(SPI_CONFIG | spi.SPI_END, 32, SPIT_ATT_WR, CS_ATT)
         self.core.delay(10.0 * us)
         self.att_reg = self.bus.read()
         self.bus.write(self.att_reg)  # shift in current value again and latch
