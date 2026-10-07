@@ -18,6 +18,7 @@ from artiq.coredevice.fastino import Fastino
 from artiq.coredevice.phaser import Phaser
 from artiq.coredevice import shuttler
 from artiq.coredevice import songbird
+from artiq.coredevice.phaser_drtio import PhaserMTDDS, PhaserMTDDSChannel
 
 
 @compile
@@ -43,6 +44,8 @@ class NAC3Devices(EnvExperiment):
     shuttler0_dcbias0: KernelInvariant[shuttler.DCBias]
     shuttler0_dds0: KernelInvariant[shuttler.DDS]
     songbird0_dds0: KernelInvariant[songbird.DDS]
+    phaser_drtio_mtdds0_fpga:  KernelInvariant[PhaserMTDDS]
+    phaser_drtio_mtdds0_channel0: KernelInvariant[PhaserMTDDSChannel]
 
     def build(self):
         self.setattr_device("core")
@@ -66,6 +69,8 @@ class NAC3Devices(EnvExperiment):
         self.setattr_device("shuttler0_dcbias0")
         self.setattr_device("shuttler0_dds0")
         self.setattr_device("songbird0_dds0")
+        self.setattr_device("phaser_drtio_mtdds0_fpga")
+        self.setattr_device("phaser_drtio_mtdds0_channel0")
 
     @kernel
     def run(self):
@@ -94,3 +99,7 @@ class NAC3Devices(EnvExperiment):
         self.sampler0.init()
         samples = [0. for _ in range(8)]
         self.sampler0.sample(samples)
+
+        self.core.break_realtime()
+        self.phaser_drtio_mtdds0_fpga.init()
+        self.phaser_drtio_mtdds0_channel0.init()

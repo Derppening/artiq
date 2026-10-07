@@ -21,6 +21,14 @@
         {
             "type": "songbird",
             "ports": [8]
+        },
+        {
+            "type": "phaser_drtio",
+            "ports": [9],
+            "gateware_variant": "mtdds",
+            "hardware_variant": "upconverter",
+            "tones": 26,
+            "dds_bandwidth": 250e6
         }
     ]
 }
