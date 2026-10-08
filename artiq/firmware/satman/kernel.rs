@@ -1,5 +1,5 @@
 use alloc::{collections::btree_map::BTreeMap, format, string::String, vec::Vec};
-use core::{mem, str};
+use core::str;
 
 use board_artiq::{drtio_routing::RoutingTable, drtioaux, mailbox, spi};
 use board_misoc::{clock, csr, i2c};
