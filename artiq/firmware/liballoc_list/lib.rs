@@ -19,7 +19,53 @@ pub struct ListAlloc {
 
 pub const EMPTY: ListAlloc = ListAlloc { root: 0 as *mut Header };
 
+/// Occupancy of a `ListAlloc`. Block headers are counted with the block they
+/// precede, so `busy + idle` is the total size of all added regions.
+#[derive(Debug, Clone, Copy)]
+pub struct Stats {
+    /// Bytes in busy blocks, headers included.
+    pub busy: usize,
+    /// Bytes in free blocks, headers included. Alignment padding is a free
+    /// block and is counted here.
+    pub idle: usize,
+    /// Largest request a single allocation could satisfy right now, ignoring
+    /// alignment padding. Runs of adjacent free blocks count as one, since
+    /// `alloc` joins them, and the result is rounded down to a multiple of the
+    /// header size, since `alloc` rounds requests up to one.
+    pub largest_free: usize,
+}
+
 impl ListAlloc {
+    pub unsafe fn stats(&self) -> Stats {
+        let header_size = mem::size_of::<Header>();
+        let mut stats = Stats { busy: 0, idle: 0, largest_free: 0 };
+        // payload of the current run of free blocks, as one block after joining
+        let mut run: Option<usize> = None;
+
+        let mut curr = self.root;
+        while !curr.is_null() {
+            match (*curr).magic {
+                MAGIC_BUSY => {
+                    stats.busy += header_size + (*curr).size;
+                    run = None;
+                }
+                MAGIC_FREE => {
+                    stats.idle += header_size + (*curr).size;
+                    let joined = match run {
+                        Some(payload) => payload + header_size + (*curr).size,
+                        None => (*curr).size,
+                    };
+                    stats.largest_free = stats.largest_free.max(joined - joined % header_size);
+                    run = Some(joined);
+                }
+                _ => panic!("heap corruption detected at {:p}", curr)
+            }
+            curr = (*curr).next;
+        }
+
+        stats
+    }
+
     pub unsafe fn add(&mut self, ptr: *mut u8, size: usize) {
         let header_size = mem::size_of::<Header>();
         if size < header_size * 2 { return }

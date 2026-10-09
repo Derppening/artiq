@@ -157,6 +157,22 @@ pub unsafe extern "C" fn free(ptr: *mut u8) {
     core::alloc::GlobalAlloc::dealloc(&ALLOC, ptr, layout);
 }
 
+#[repr(C)]
+struct HeapStats {
+    busy: i32,
+    idle: i32,
+    largest_free: i32,
+}
+
+extern "C" fn heap_stats() -> HeapStats {
+    let stats = unsafe { ALLOC.stats() };
+    HeapStats {
+        busy: stats.busy as i32,
+        idle: stats.idle as i32,
+        largest_free: stats.largest_free as i32,
+    }
+}
+
 #[no_mangle]
 pub extern fn send_to_core_log(text: CSlice<u8>) {
     match str::from_utf8(text.as_ref()) {

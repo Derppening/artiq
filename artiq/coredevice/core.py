@@ -29,6 +29,16 @@ def rtio_get_counter() -> int64:
     raise NotImplementedError("syscall not simulated")
 
 @extern
+def heap_stats() -> tuple[int32, int32, int32]:
+    """Kernel heap occupancy as ``(busy, idle, largest_free)`` in bytes.
+
+    ``busy + idle`` is the size of the kernel heap. ``largest_free`` is the
+    largest single allocation the heap could satisfy right now. Only provided
+    by the ARTIQ (RISC-V) firmware, not by artiq-zynq.
+    """
+    raise NotImplementedError("syscall not simulated")
+
+@extern
 def test_exception_id_sync(id: int32):
     raise NotImplementedError("syscall not simulated")
 

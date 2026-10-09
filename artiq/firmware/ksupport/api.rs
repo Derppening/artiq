@@ -145,6 +145,7 @@ static mut API: &'static [(&'static str, *const ())] = &[
 
     api!(malloc = ::malloc),
     api!(free = ::free),
+    api!(heap_stats = ::heap_stats),
 
     api!(rpc_send = ::rpc_send),
     api!(rpc_send_async = ::rpc_send_async),
