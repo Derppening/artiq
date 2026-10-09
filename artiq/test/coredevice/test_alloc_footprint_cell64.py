@@ -32,6 +32,13 @@ reset heap, sampling ``heap_stats`` four times:
 3. ``live``: after the workload, with the objects it returns still alive.
 4. ``released``: after ``_hold_rc``/``_hold_ctrc`` returns and drops them.
 
+Between ``entered`` and ``live`` the heap's high-water marks are tracked with
+``heap_peak_reset``/``heap_peak`` (firmware feature ``heap_peak``): the most
+bytes busy at once, which catches objects allocated and freed inside the
+workload, and the most live allocations at once. Under CTRC the slab pages are
+one allocation each and the cells inside them are not seen; NAC3's ``memprof``
+build reports those.
+
 The two modes have separate kernel entry points. A kernel that may enter
 ``with critical`` reserves CTRC pages on entry, before ``start``, and NAC3
 decides that from which functions are reachable, not from branch conditions, so
@@ -57,7 +64,7 @@ most 11 slots; a comprehension over ``range(n)`` allocates ``n + 1`` slots, so
 from numpy import int32
 
 from artiq.experiment import *
-from artiq.coredevice.core import Core, heap_stats
+from artiq.coredevice.core import Core, heap_stats, heap_peak, heap_peak_reset
 from artiq.test.hardware_testbench import ExperimentCase
 
 
@@ -83,6 +90,8 @@ class _AllocFootprintCell64(EnvExperiment):
     busy_live: Kernel[int32]
     busy_released: Kernel[int32]
     largest_free_released: Kernel[int32]
+    peak_bytes: Kernel[int32]
+    peak_blocks: Kernel[int32]
 
     def build(self):
         self.setattr_device("core")
@@ -93,6 +102,8 @@ class _AllocFootprintCell64(EnvExperiment):
         self.busy_live = 0
         self.busy_released = 0
         self.largest_free_released = 0
+        self.peak_bytes = 0
+        self.peak_blocks = 0
 
     # ---- workloads ---------------------------------------------------------
 
@@ -142,9 +153,13 @@ class _AllocFootprintCell64(EnvExperiment):
         keep = [[int32(0)]]
         (busy, idle, largest_free) = heap_stats()
         self.busy_entered = busy
+        heap_peak_reset()
         keep = self._workload(which)
         (busy, idle, largest_free) = heap_stats()
         self.busy_live = busy
+        (peak_bytes, peak_blocks) = heap_peak()
+        self.peak_bytes = peak_bytes
+        self.peak_blocks = peak_blocks
 
     @kernel
     def _hold_ctrc(self, which: int32):
@@ -153,9 +168,13 @@ class _AllocFootprintCell64(EnvExperiment):
         with critical(_CTRC_PAGES):
             (busy, idle, largest_free) = heap_stats()
             self.busy_entered = busy
+            heap_peak_reset()
             keep = self._workload(which)
         (busy, idle, largest_free) = heap_stats()
         self.busy_live = busy
+        (peak_bytes, peak_blocks) = heap_peak()
+        self.peak_bytes = peak_bytes
+        self.peak_blocks = peak_blocks
 
     # One entry point per mode. NAC3 makes a kernel reserve CTRC pages on entry
     # if a ``with critical`` block is reachable from it, whatever the branch
@@ -189,14 +208,16 @@ class _AllocFootprintCell64Mixin:
             return
         width = max(len(r[0]) for r in cls.results)
         print()
-        print("{} (ctrc={}, 64 B cells, bytes relative to kernel start)".format(cls.__name__, cls.ctrc))
-        print("| {} | busy at start | on entry | while live | after drop | largest free after drop |"
+        print("{} (ctrc={}, 64 B cells, bytes relative to kernel start, peak live blocks absolute)".format(cls.__name__, cls.ctrc))
+        print("| {} | busy at start | on entry | while live | after drop | largest free after drop "
+              "| peak during workload | peak live blocks |"
               .format("workload".ljust(width)))
-        print("| {} | ------------- | -------- | ---------- | ---------- | ----------------------- |"
+        print("| {} | ------------- | -------- | ---------- | ---------- | ----------------------- "
+              "| -------------------- | ---------------- |"
               .format("-" * width))
-        for name, start, entered, live, released, largest in cls.results:
-            print("| {} | {:>13d} | {:>8d} | {:>10d} | {:>10d} | {:>23d} |".format(
-                name.ljust(width), start, entered, live, released, largest))
+        for name, start, entered, live, released, largest, peak, blocks in cls.results:
+            print("| {} | {:>13d} | {:>8d} | {:>10d} | {:>10d} | {:>23d} | {:>20d} | {:>16d} |".format(
+                name.ljust(width), start, entered, live, released, largest, peak, blocks))
 
     def _measure(self, name, which):
         exp = self.create(_AllocFootprintCell64)
@@ -214,7 +235,9 @@ class _AllocFootprintCell64Mixin:
                              exp.busy_entered - start,
                              exp.busy_live - start,
                              exp.busy_released - start,
-                             exp.largest_free_released))
+                             exp.largest_free_released,
+                             exp.peak_bytes - start,
+                             exp.peak_blocks))
 
     def test_control(self):
         self._measure("control", WL_CONTROL)
