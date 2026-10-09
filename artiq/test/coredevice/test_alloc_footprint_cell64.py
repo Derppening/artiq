@@ -14,7 +14,7 @@ that build; the 128-byte file does not compile there. Differences from the
   The RC leak per exception is unchanged from the 128-byte file.
 * ``_CTRC_PAGES`` is 32: 32 * 63 = 2016 cells, at least the 1984 objects that
   64 pages held with 128-byte cells. A cell64 build also reserves 8 pages, not
-  16, at kernel entry, which shows up in ``busy at start``.
+  16, at kernel entry, which shows up in the CTRC class's ``busy at start``.
 
 Kernels allocate from a heap owned by ksupport (``__kernel_heap_start`` ..
 ``__kernel_heap_end``, 64 MiB on the RISC-V targets) that is reset at every
@@ -22,15 +22,21 @@ kernel load. The ``heap_stats`` syscall reports its occupancy in bytes,
 allocator block headers included, so every number below is what the workload
 actually costs the heap, not what NAC3 requested.
 
-Each test runs one kernel, ``measure``, on a freshly reset heap, sampling
-``heap_stats`` four times:
+Each test runs one kernel, ``measure_rc`` or ``measure_ctrc``, on a freshly
+reset heap, sampling ``heap_stats`` four times:
 
 1. ``start``: before anything else.
 2. ``entered``: just inside ``with critical(...)`` for the CTRC class, just
    before the workload for the RC class. Under CTRC the difference from
    ``start`` is the slab pages reserved on entry, which are never returned.
 3. ``live``: after the workload, with the objects it returns still alive.
-4. ``released``: after ``_hold`` returns and drops them.
+4. ``released``: after ``_hold_rc``/``_hold_ctrc`` returns and drops them.
+
+The two modes have separate kernel entry points. A kernel that may enter
+``with critical`` reserves CTRC pages on entry, before ``start``, and NAC3
+decides that from which functions are reachable, not from branch conditions, so
+an entry point shared by both modes would make the RC kernel reserve too. The
+RC class's ``start`` is therefore the heap with nothing on it.
 
 ``largest_free`` at ``released`` shows fragmentation: ksupport only joins
 adjacent free blocks lazily inside ``malloc``.
@@ -70,7 +76,6 @@ _RANGE_ITERS = 1000
 @compile
 class _AllocFootprintCell64(EnvExperiment):
     core: KernelInvariant[Core]
-    ctrc: KernelInvariant[bool]
     heap_size: Kernel[int32]
     heap_size_end: Kernel[int32]
     busy_start: Kernel[int32]
@@ -79,9 +84,8 @@ class _AllocFootprintCell64(EnvExperiment):
     busy_released: Kernel[int32]
     largest_free_released: Kernel[int32]
 
-    def build(self, ctrc=False):
+    def build(self):
         self.setattr_device("core")
-        self.ctrc = ctrc
         self.heap_size = 0
         self.heap_size_end = 0
         self.busy_start = 0
@@ -119,32 +123,55 @@ class _AllocFootprintCell64(EnvExperiment):
     # ---- measurement -------------------------------------------------------
 
     @kernel
-    def _hold(self, which: int32):
+    def _sample_start(self):
+        (busy, idle, largest_free) = heap_stats()
+        self.heap_size = busy + idle
+        self.busy_start = busy
+
+    @kernel
+    def _sample_released(self):
+        (busy, idle, largest_free) = heap_stats()
+        self.busy_released = busy
+        self.largest_free_released = largest_free
+        self.heap_size_end = busy + idle
+
+    @kernel
+    def _hold_rc(self, which: int32):
         """Run the workload and sample with its result alive. The result is
         dropped when this returns."""
         keep = [[int32(0)]]
-        if self.ctrc:
-            with critical(_CTRC_PAGES):
-                (busy, idle, largest_free) = heap_stats()
-                self.busy_entered = busy
-                keep = self._workload(which)
-        else:
+        (busy, idle, largest_free) = heap_stats()
+        self.busy_entered = busy
+        keep = self._workload(which)
+        (busy, idle, largest_free) = heap_stats()
+        self.busy_live = busy
+
+    @kernel
+    def _hold_ctrc(self, which: int32):
+        """As ``_hold_rc``, with the workload inside ``with critical(...)``."""
+        keep = [[int32(0)]]
+        with critical(_CTRC_PAGES):
             (busy, idle, largest_free) = heap_stats()
             self.busy_entered = busy
             keep = self._workload(which)
         (busy, idle, largest_free) = heap_stats()
         self.busy_live = busy
 
+    # One entry point per mode. NAC3 makes a kernel reserve CTRC pages on entry
+    # if a ``with critical`` block is reachable from it, whatever the branch
+    # conditions on the way, so the RC kernel must not reach one at all.
+
     @kernel
-    def measure(self, which: int32):
-        (busy, idle, largest_free) = heap_stats()
-        self.heap_size = busy + idle
-        self.busy_start = busy
-        self._hold(which)
-        (busy, idle, largest_free) = heap_stats()
-        self.busy_released = busy
-        self.largest_free_released = largest_free
-        self.heap_size_end = busy + idle
+    def measure_rc(self, which: int32):
+        self._sample_start()
+        self._hold_rc(which)
+        self._sample_released()
+
+    @kernel
+    def measure_ctrc(self, which: int32):
+        self._sample_start()
+        self._hold_ctrc(which)
+        self._sample_released()
 
 
 class _AllocFootprintCell64Mixin:
@@ -172,10 +199,13 @@ class _AllocFootprintCell64Mixin:
                 name.ljust(width), start, entered, live, released, largest))
 
     def _measure(self, name, which):
-        exp = self.create(_AllocFootprintCell64, ctrc=self.ctrc)
+        exp = self.create(_AllocFootprintCell64)
         if exp.core.target == "cortexa9":
             self.skipTest("heap_stats is not provided by the Zynq firmware")
-        exp.measure(which)
+        if self.ctrc:
+            exp.measure_ctrc(which)
+        else:
+            exp.measure_rc(which)
         self.assertGreater(exp.heap_size, 0, "heap_stats reported an empty heap")
         self.assertEqual(exp.heap_size, exp.heap_size_end,
                          "busy + idle changed during the kernel")

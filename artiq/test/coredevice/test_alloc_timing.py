@@ -61,14 +61,12 @@ class _Point:
 @compile
 class _AllocTiming(EnvExperiment):
     core: KernelInvariant[Core]
-    ctrc: KernelInvariant[bool]
     n: KernelInvariant[int32]
     ts: Kernel[list[float]]
     acc: Kernel[int32]
 
-    def build(self, ctrc=False, n=1000):
+    def build(self, n=1000):
         self.setattr_device("core")
-        self.ctrc = ctrc
         self.n = n
         self.ts = [0.0] * n
         self.acc = 0
@@ -114,12 +112,17 @@ class _AllocTiming(EnvExperiment):
             self.ts[i] = self.core.mu_to_seconds(t1 - t0)
         self.acc = acc
 
+    # One entry point per mode. NAC3 makes a kernel reserve CTRC pages on entry
+    # if a ``with critical`` block is reachable from it, whatever the branch
+    # conditions on the way, so the RC kernel must not reach one at all.
+
     @kernel
-    def bench(self, which: int32):
-        if self.ctrc:
-            with critical(_CTRC_PAGES):
-                self._loop(which)
-        else:
+    def bench_rc(self, which: int32):
+        self._loop(which)
+
+    @kernel
+    def bench_ctrc(self, which: int32):
+        with critical(_CTRC_PAGES):
             self._loop(which)
 
 
@@ -147,8 +150,11 @@ class _AllocTimingMixin:
                 name.ljust(width), mean * 1e6, std * 1e6, mx * 1e6))
 
     def _bench(self, name, which):
-        exp = self.create(_AllocTiming, ctrc=self.ctrc, n=self.n)
-        exp.bench(which)
+        exp = self.create(_AllocTiming, n=self.n)
+        if self.ctrc:
+            exp.bench_ctrc(which)
+        else:
+            exp.bench_rc(which)
         ts = numpy.array(exp.ts)
         self.results.append((name, ts.mean(), ts.std(), ts.max()))
         # Loose sanity bound only; the comparison is done by eye across the
