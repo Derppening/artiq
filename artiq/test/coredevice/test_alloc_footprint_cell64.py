@@ -6,9 +6,9 @@ This is ``test_alloc_footprint.py`` adapted to a NAC3 built with
 that build; the 128-byte file does not compile there. Differences from the
 128-byte file:
 
-* ``retain_flat`` and ``retain_tree`` keep 12 lists instead of 24, and
-  ``retain_tree``'s lists hold 12 ints instead of 24, so every buffer is at most
-  16 + 12 * 4 = 64 B.
+* ``retain_flat`` and ``retain_tree`` keep 10 lists instead of 24, and
+  ``retain_tree``'s lists hold 10 ints instead of 24, so every buffer is at most
+  60 B (see below).
 * There is no ``exceptions`` workload. An exception object is 72 B, which no
   longer fits in a cell, so ``raise`` inside ``with critical(...)`` is rejected.
   The RC leak per exception is unchanged from the 128-byte file.
@@ -40,8 +40,10 @@ workload outgrows the reservation, because slab cells come out of pages that
 are already counted as busy. The slab's own occupancy is reported by NAC3's
 ``memprof`` build, not here.
 
-Retained working sets are capped by the cell size: a list buffer of 12 ints or
-12 pointers is 16 + 48 = 64 B, so ``retain_tree`` is 12 lists of 12 ints.
+Retained working sets are capped by the cell size. A list buffer is 16 B + 4 B
+per slot, rounded up to a multiple of 20 B, so it fits in a 64-byte cell with at
+most 11 slots; a comprehension over ``range(n)`` allocates ``n + 1`` slots, so
+``retain_tree`` is 10 lists of 10 ints (16 + 11 * 4 = 60 B buffers).
 
     python -m unittest -v artiq.test.coredevice.test_alloc_footprint_cell64
 """
@@ -93,11 +95,11 @@ class _AllocFootprintCell64(EnvExperiment):
     @kernel
     def _workload(self, which: int32) -> list[list[int32]]:
         if which == WL_RETAIN_FLAT:
-            # 1 outer + 12 single-element lists, all kept alive
-            return [[i] for i in range(12)]
+            # 1 outer + 10 single-element lists, all kept alive
+            return [[i] for i in range(10)]
         elif which == WL_RETAIN_TREE:
-            # 1 outer + 12 lists of 12 ints (64 B buffers), all kept alive
-            return [[i + j for j in range(12)] for i in range(12)]
+            # 1 outer + 10 lists of 10 ints (60 B buffers), all kept alive
+            return [[i + j for j in range(10)] for i in range(10)]
         elif which == WL_CHURN:
             # allocate and drop 10000 small lists, keep nothing
             acc = int32(0)

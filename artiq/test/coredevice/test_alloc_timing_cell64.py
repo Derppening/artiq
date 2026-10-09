@@ -6,12 +6,14 @@ This is ``test_alloc_timing.py`` adapted to a NAC3 built with
 that build; the 128-byte file does not compile there.
 
 Every object built here fits in one 64-byte CTRC cell on the 32-bit core
-device: a list object is 16 B, a list buffer is 16 B + 4 B per ``int32`` or
-pointer, so a list holds at most 12 elements, and a ``_Point`` is 16 B.
+device. A list object is 16 B and a ``_Point`` is 16 B. A list buffer is
+16 B + 4 B per slot, rounded up to a multiple of 20 B, so it fits in a cell
+with at most 11 slots; a comprehension over ``range(n)`` allocates ``n + 1``
+slots, so it may have at most 10 elements.
 Differences from the 128-byte file:
 
-* ``burst`` builds 12 inner lists instead of 24, so its outer buffer is
-  16 + 12 * 4 = 64 B.
+* ``burst`` builds 10 inner lists instead of 24, so its outer buffer has 11
+  slots: 16 + 11 * 4 = 60 B.
 * There is no ``exception`` workload. An exception object is 72 B, which no
   longer fits in a cell, so ``raise`` inside ``with critical(...)`` is rejected.
   The RC cost of raising is unchanged from the 128-byte file.
@@ -40,7 +42,7 @@ WL_BURST = 5
 WL_RANGE = 6
 
 # Pages reserved by ``with critical(...)``. One page is 63 cells. The largest
-# workload (``burst``) keeps 1 outer + 12 inner lists, 2 cells each, plus one
+# workload (``burst``) keeps 1 outer + 10 inner lists, 2 cells each, plus one
 # range object live at a time.
 _CTRC_PAGES = 32
 
@@ -94,10 +96,10 @@ class _AllocTimingCell64(EnvExperiment):
                 l = [[i], [i + 1], [i + 2]]
                 acc += l[2][0]
             elif which == WL_BURST:
-                # 1 outer (16 B + 12 ptr = 64 B buffer) + 12 inner lists,
-                # plus one range object: ~27 cells live, all dropped at once
-                b = [[i] for _ in range(12)]
-                acc += b[11][0]
+                # 1 outer (16 B + 11 slots = 60 B buffer) + 10 inner lists,
+                # plus one range object: ~23 cells live, all dropped at once
+                b = [[i] for _ in range(10)]
+                acc += b[9][0]
             elif which == WL_RANGE:
                 # 1 leaf object
                 for j in range(i, i + 2):
