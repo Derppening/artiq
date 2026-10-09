@@ -39,6 +39,26 @@ def heap_stats() -> tuple[int32, int32, int32]:
     raise NotImplementedError("syscall not simulated")
 
 @extern
+def heap_peak() -> tuple[int32, int32]:
+    """Kernel heap high-water marks as ``(bytes, blocks)``, since the kernel
+    was loaded or :func:`heap_peak_reset` was last called.
+
+    ``bytes`` is the most bytes busy at once, counted as ``busy`` in
+    :func:`heap_stats`. ``blocks`` is the most busy blocks, i.e. live
+    allocations, at once. The two are tracked separately and need not have
+    been reached at the same time.
+
+    Only provided by the ARTIQ (RISC-V) firmware built with the ``ksupport``
+    feature ``heap_peak`` (on by default), not by artiq-zynq.
+    """
+    raise NotImplementedError("syscall not simulated")
+
+@extern
+def heap_peak_reset():
+    """Restart :func:`heap_peak` from the bytes busy now."""
+    raise NotImplementedError("syscall not simulated")
+
+@extern
 def test_exception_id_sync(id: int32):
     raise NotImplementedError("syscall not simulated")
 

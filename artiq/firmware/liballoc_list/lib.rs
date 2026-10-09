@@ -32,13 +32,33 @@ pub struct ListAlloc {
     // First block of the most recently added region.
     root:  *mut Header,
     // Free blocks only, most recently freed first.
-    free:  Cell<*mut Header>
+    free:  Cell<*mut Header>,
+    /// Busy blocks right now.
+    #[cfg(feature = "peak")]
+    now:   Cell<Usage>,
+    /// Most of each field of `now` since creation or `reset_peak`.
+    #[cfg(feature = "peak")]
+    peak:  Cell<Usage>
 }
 
 pub const EMPTY: ListAlloc = ListAlloc {
     root: 0 as *mut Header,
-    free: Cell::new(0 as *mut Header)
+    free: Cell::new(0 as *mut Header),
+    #[cfg(feature = "peak")]
+    now:  Cell::new(Usage { bytes: 0, blocks: 0 }),
+    #[cfg(feature = "peak")]
+    peak: Cell::new(Usage { bytes: 0, blocks: 0 })
 };
+
+/// Busy blocks of a `ListAlloc`, as tracked with the `peak` feature.
+#[cfg(feature = "peak")]
+#[derive(Debug, Clone, Copy)]
+pub struct Usage {
+    /// Bytes in busy blocks, headers included, as `Stats::busy` counts them.
+    pub bytes: usize,
+    /// Busy blocks, i.e. live allocations.
+    pub blocks: usize,
+}
 
 unsafe fn links(header: *mut Header) -> *mut Links {
     header.offset(1) as *mut Links
@@ -127,6 +147,45 @@ impl ListAlloc {
         stats
     }
 
+    /// Most busy bytes and most busy blocks since the allocator was created or
+    /// `reset_peak` was last called. The two maxima are tracked separately and
+    /// need not have been reached at the same time.
+    #[cfg(feature = "peak")]
+    pub fn peak(&self) -> Usage {
+        self.peak.get()
+    }
+
+    /// Restarts `peak` from the busy blocks now.
+    #[cfg(feature = "peak")]
+    pub fn reset_peak(&self) {
+        self.peak.set(self.now.get())
+    }
+
+    /// Records that the block at `header` has become busy, or free if `busy`
+    /// is false. Its size must be final.
+    #[inline(always)]
+    unsafe fn track(&self, header: *const Header, busy: bool) {
+        #[cfg(feature = "peak")]
+        {
+            let bytes = mem::size_of::<Header>() + (*header).size;
+            let mut now = self.now.get();
+            if busy {
+                now.bytes += bytes;
+                now.blocks += 1;
+                let mut peak = self.peak.get();
+                peak.bytes = peak.bytes.max(now.bytes);
+                peak.blocks = peak.blocks.max(now.blocks);
+                self.peak.set(peak);
+            } else {
+                now.bytes -= bytes;
+                now.blocks -= 1;
+            }
+            self.now.set(now);
+        }
+        #[cfg(not(feature = "peak"))]
+        let _ = (header, busy);
+    }
+
     pub unsafe fn add(&mut self, ptr: *mut u8, size: usize) {
         let header_size = mem::size_of::<Header>();
         let padding = (header_size - ptr as usize % header_size) % header_size;
@@ -141,6 +200,16 @@ impl ListAlloc {
         let end = following(curr);
         (*end).magic = MAGIC_END;
         (*end).size  = self.root as usize;
+        #[cfg(feature = "peak")]
+        {
+            // Stats counts the end marker as busy
+            let mut now = self.now.get();
+            now.bytes += header_size;
+            self.now.set(now);
+            let mut peak = self.peak.get();
+            peak.bytes = peak.bytes.max(now.bytes);
+            self.peak.set(peak);
+        }
 
         self.root = curr;
         self.push_free(curr);
@@ -232,6 +301,7 @@ unsafe impl GlobalAlloc for ListAlloc {
                     }
 
                     self.unlink_free(curr);
+                    self.track(curr, true);
                     (*curr).magic = MAGIC_BUSY;
                     return curr.offset(1) as *mut u8
                 }
@@ -252,6 +322,7 @@ unsafe impl GlobalAlloc for ListAlloc {
                         self.insert_free_after(curr, rest);
                     }
 
+                    self.track(block, true);
                     (*block).magic = MAGIC_BUSY;
                     return block.offset(1) as *mut u8
                 }
@@ -268,6 +339,7 @@ unsafe impl GlobalAlloc for ListAlloc {
         if (*curr).magic != MAGIC_BUSY {
             panic!("heap corruption detected at {:p}", curr)
         }
+        self.track(curr, false);
         (*curr).magic = MAGIC_FREE;
         self.push_free(curr);
     }

@@ -173,6 +173,27 @@ extern "C" fn heap_stats() -> HeapStats {
     }
 }
 
+#[cfg(feature = "heap_peak")]
+#[repr(C)]
+struct HeapPeak {
+    bytes: i32,
+    blocks: i32,
+}
+
+#[cfg(feature = "heap_peak")]
+extern "C" fn heap_peak() -> HeapPeak {
+    let peak = unsafe { ALLOC.peak() };
+    HeapPeak {
+        bytes: peak.bytes as i32,
+        blocks: peak.blocks as i32,
+    }
+}
+
+#[cfg(feature = "heap_peak")]
+extern "C" fn heap_peak_reset() {
+    unsafe { ALLOC.reset_peak() }
+}
+
 #[no_mangle]
 pub extern fn send_to_core_log(text: CSlice<u8>) {
     match str::from_utf8(text.as_ref()) {

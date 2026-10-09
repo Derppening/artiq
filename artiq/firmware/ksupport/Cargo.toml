@@ -9,6 +9,12 @@ name = "ksupport"
 path = "lib.rs"
 crate-type = ["staticlib"]
 
+[features]
+default = ["heap_peak"]
+# Exports the `heap_peak` and `heap_peak_reset` syscalls, at a few instructions
+# per kernel malloc and free.
+heap_peak = ["alloc_list/peak"]
+
 [build-dependencies]
 build_misoc = { path = "../libbuild_misoc" }
 
