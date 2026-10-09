@@ -146,6 +146,10 @@ static mut API: &'static [(&'static str, *const ())] = &[
     api!(malloc = ::malloc),
     api!(free = ::free),
     api!(heap_stats = ::heap_stats),
+    #[cfg(feature = "heap_peak")]
+    api!(heap_peak = ::heap_peak),
+    #[cfg(feature = "heap_peak")]
+    api!(heap_peak_reset = ::heap_peak_reset),
 
     api!(rpc_send = ::rpc_send),
     api!(rpc_send_async = ::rpc_send_async),

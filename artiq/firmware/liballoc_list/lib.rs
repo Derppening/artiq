@@ -2,6 +2,8 @@
 
 use core::{ptr, mem, fmt};
 use core::alloc::{GlobalAlloc, Layout};
+#[cfg(feature = "peak")]
+use core::cell::Cell;
 
 const MAGIC_FREE: usize = 0xDEADDEAD;
 const MAGIC_BUSY: usize = 0xFEEDFEED;
@@ -14,10 +16,32 @@ struct Header {
 }
 
 pub struct ListAlloc {
-    root:  *mut Header
+    root:  *mut Header,
+    /// Busy blocks right now.
+    #[cfg(feature = "peak")]
+    now:   Cell<Usage>,
+    /// Most of each field of `now` since creation or `reset_peak`.
+    #[cfg(feature = "peak")]
+    peak:  Cell<Usage>
 }
 
-pub const EMPTY: ListAlloc = ListAlloc { root: 0 as *mut Header };
+pub const EMPTY: ListAlloc = ListAlloc {
+    root: 0 as *mut Header,
+    #[cfg(feature = "peak")]
+    now:  Cell::new(Usage { bytes: 0, blocks: 0 }),
+    #[cfg(feature = "peak")]
+    peak: Cell::new(Usage { bytes: 0, blocks: 0 })
+};
+
+/// Busy blocks of a `ListAlloc`, as tracked with the `peak` feature.
+#[cfg(feature = "peak")]
+#[derive(Debug, Clone, Copy)]
+pub struct Usage {
+    /// Bytes in busy blocks, headers included, as `Stats::busy` counts them.
+    pub bytes: usize,
+    /// Busy blocks, i.e. live allocations.
+    pub blocks: usize,
+}
 
 /// Occupancy of a `ListAlloc`. Block headers are counted with the block they
 /// precede, so `busy + idle` is the total size of all added regions.
@@ -64,6 +88,45 @@ impl ListAlloc {
         }
 
         stats
+    }
+
+    /// Most busy bytes and most busy blocks since the allocator was created or
+    /// `reset_peak` was last called. The two maxima are tracked separately and
+    /// need not have been reached at the same time.
+    #[cfg(feature = "peak")]
+    pub fn peak(&self) -> Usage {
+        self.peak.get()
+    }
+
+    /// Restarts `peak` from the busy blocks now.
+    #[cfg(feature = "peak")]
+    pub fn reset_peak(&self) {
+        self.peak.set(self.now.get())
+    }
+
+    /// Records that the block at `header` has become busy, or free if `busy`
+    /// is false. Its size must be final.
+    #[inline(always)]
+    unsafe fn track(&self, header: *const Header, busy: bool) {
+        #[cfg(feature = "peak")]
+        {
+            let bytes = mem::size_of::<Header>() + (*header).size;
+            let mut now = self.now.get();
+            if busy {
+                now.bytes += bytes;
+                now.blocks += 1;
+                let mut peak = self.peak.get();
+                peak.bytes = peak.bytes.max(now.bytes);
+                peak.blocks = peak.blocks.max(now.blocks);
+                self.peak.set(peak);
+            } else {
+                now.bytes -= bytes;
+                now.blocks -= 1;
+            }
+            self.now.set(now);
+        }
+        #[cfg(not(feature = "peak"))]
+        let _ = (header, busy);
     }
 
     pub unsafe fn add(&mut self, ptr: *mut u8, size: usize) {
@@ -125,6 +188,7 @@ unsafe impl GlobalAlloc for ListAlloc {
                         }
 
                         if (*curr).size >= size {
+                            self.track(curr, true);
                             (*curr).magic = MAGIC_BUSY;
                             return curr.offset(1) as *mut u8
                         }
@@ -146,6 +210,7 @@ unsafe impl GlobalAlloc for ListAlloc {
                                 split(curr, size);
                             }
 
+                            self.track(curr, true);
                             (*curr).magic = MAGIC_BUSY;
                             return curr.offset(1) as *mut u8
                         }
@@ -165,6 +230,7 @@ unsafe impl GlobalAlloc for ListAlloc {
         if (*curr).magic != MAGIC_BUSY {
             panic!("heap corruption detected at {:p}", curr)
         }
+        self.track(curr, false);
         (*curr).magic = MAGIC_FREE;
     }
 }
