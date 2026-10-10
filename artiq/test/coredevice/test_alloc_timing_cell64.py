@@ -17,8 +17,10 @@ Differences from the 128-byte file:
 * There is no ``exception`` workload. An exception object is 72 B, which no
   longer fits in a cell, so ``raise`` inside ``with critical(...)`` is rejected.
   The RC cost of raising is unchanged from the 128-byte file.
-* ``_CTRC_PAGES`` is 32: 32 * 63 = 2016 cells, at least the 1984 objects that
-  64 pages held with 128-byte cells.
+* ``_CTRC_PAGES`` is 133, so the file also runs on the 128- and 256-byte cell
+  builds: 133 * 15 = 1995 cells with 256-byte cells, at least the 1984 objects
+  that 64 pages hold with 128-byte cells. With 64- and 128-byte cells it is
+  133 * 63 = 8379 and 133 * 31 = 4123 cells.
 
 The ``pattern_*`` rows build up a live set of objects and time each allocation
 on its own, so the allocator works against a heap that already holds up to
@@ -66,11 +68,12 @@ PAT_INTERLEAVED = 2
 PAT_REUSE_32_16 = 3
 PAT_REUSE_16_32 = 4
 
-# Pages reserved by ``with critical(...)``. One page is 63 cells. The largest
-# workload (``burst``) keeps 1 outer + 10 inner lists, 2 cells each, plus one
-# range object live at a time. The pattern workloads keep at most ``n``
-# objects live, one cell each.
-_CTRC_PAGES = 32
+# Pages reserved by ``with critical(...)``. One page is 63, 31 or 15 cells
+# with 64-, 128- or 256-byte cells. The largest workload of the ``_loop`` rows
+# (``burst``) keeps 1 outer + 10 inner lists, 2 cells each, plus one range
+# object live at a time. The pattern workloads keep at most ``n`` objects live,
+# one cell each, which 133 pages hold even with 256-byte cells (1995 cells).
+_CTRC_PAGES = 133
 
 
 @compile
