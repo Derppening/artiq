@@ -18,13 +18,32 @@ Two rows are deliberately degenerate:
   delete entirely at ``NAC3_OPT_LEVEL`` > 0. A near-zero delta there is the
   optimisation working, not the allocator.
 
+The ``pattern_*`` rows instead build up a live set of objects and time each
+allocation on its own, so the allocator works against a heap that already holds
+up to ``n`` objects. The objects are ``_Obj32`` (32 B) and ``_Obj64`` (64 B),
+both one CTRC cell, and are stored into holder lists that are allocated, filled
+with one shared placeholder, before ``with critical(...)``: a holder is far
+larger than a cell, and filling it with distinct objects would leave ``n`` extra
+blocks on the RC heap.
+
+* ``pattern_fill_32``, ``pattern_fill_64``: allocate ``n`` objects of one size.
+* ``pattern_interleaved``: allocate ``n / 2`` pairs of a 32 B then a 64 B
+  object. The reverse order is not run: neither allocator sees a difference.
+* ``pattern_reuse_64_32``: allocate ``n`` 64 B objects, free every other one,
+  then time allocating ``n / 2`` 32 B objects, which fit in the holes.
+* ``pattern_reuse_32_64``: the same with the sizes swapped; the 64 B objects
+  do not fit in the 32 B holes.
+
+Only the allocations are timed: the setup of the reuse rows is not, and nothing
+is dropped inside the timed region.
+
 Run both classes and compare the two tables printed at the end:
 
     python -m unittest -v artiq.test.coredevice.test_alloc_timing
 """
 
 import numpy
-from numpy import int32
+from numpy import int32, int64
 
 from artiq.experiment import *
 from artiq.coredevice.core import Core
@@ -40,10 +59,17 @@ WL_BURST = 5
 WL_RANGE = 6
 WL_EXCEPTION = 7
 
+PAT_FILL_32 = 0
+PAT_FILL_64 = 1
+PAT_INTERLEAVED = 2
+PAT_REUSE_64_32 = 3
+PAT_REUSE_32_64 = 4
+
 # Pages reserved by ``with critical(...)``. One page is 31 cells. The exception
 # workload leaks one cell per iteration (nothing releases an exception object),
 # so the reservation must cover ``n`` iterations plus the live working set of
 # the largest workload (``burst``: 1 outer + 24 inner lists, 2 cells each).
+# The pattern workloads keep at most ``n`` objects live, one cell each.
 _CTRC_PAGES = 64
 
 
@@ -56,6 +82,42 @@ class _Point:
     def __init__(self, x: int32, y: int32):
         self.x = x
         self.y = y
+
+
+@compile
+class _Obj32:
+    """8 B header + 3 ``int64`` = 32 B."""
+    f0: Kernel[int64]
+    f1: Kernel[int64]
+    f2: Kernel[int64]
+
+    @kernel
+    def __init__(self, v: int32):
+        self.f0 = int64(v)
+        self.f1 = int64(v)
+        self.f2 = int64(v)
+
+
+@compile
+class _Obj64:
+    """8 B header + 7 ``int64`` = 64 B."""
+    f0: Kernel[int64]
+    f1: Kernel[int64]
+    f2: Kernel[int64]
+    f3: Kernel[int64]
+    f4: Kernel[int64]
+    f5: Kernel[int64]
+    f6: Kernel[int64]
+
+    @kernel
+    def __init__(self, v: int32):
+        self.f0 = int64(v)
+        self.f1 = int64(v)
+        self.f2 = int64(v)
+        self.f3 = int64(v)
+        self.f4 = int64(v)
+        self.f5 = int64(v)
+        self.f6 = int64(v)
 
 
 @compile
@@ -126,6 +188,90 @@ class _AllocTiming(EnvExperiment):
             self._loop(which)
 
 
+@compile
+class _AllocPattern(EnvExperiment):
+    core: KernelInvariant[Core]
+    n: KernelInvariant[int32]
+    ts: Kernel[list[float]]
+
+    def build(self, n=1000):
+        self.setattr_device("core")
+        self.n = n
+        self.ts = [0.0] * n
+
+    @kernel
+    def _pattern(self, which: int32, p32: _Obj32, p64: _Obj64,
+                 h32: list[_Obj32], h64: list[_Obj64],
+                 r32: list[_Obj32], r64: list[_Obj64]):
+        half = self.n // 2
+        if which == PAT_FILL_32:
+            for i in range(self.n):
+                t0 = self.core.get_rtio_counter_mu()
+                h32[i] = _Obj32(i)
+                t1 = self.core.get_rtio_counter_mu()
+                self.ts[i] = self.core.mu_to_seconds(t1 - t0)
+        elif which == PAT_FILL_64:
+            for i in range(self.n):
+                t0 = self.core.get_rtio_counter_mu()
+                h64[i] = _Obj64(i)
+                t1 = self.core.get_rtio_counter_mu()
+                self.ts[i] = self.core.mu_to_seconds(t1 - t0)
+        elif which == PAT_INTERLEAVED:
+            for i in range(half):
+                t0 = self.core.get_rtio_counter_mu()
+                h32[i] = _Obj32(i)
+                t1 = self.core.get_rtio_counter_mu()
+                self.ts[2 * i] = self.core.mu_to_seconds(t1 - t0)
+                t0 = self.core.get_rtio_counter_mu()
+                h64[i] = _Obj64(i)
+                t1 = self.core.get_rtio_counter_mu()
+                self.ts[2 * i + 1] = self.core.mu_to_seconds(t1 - t0)
+        elif which == PAT_REUSE_64_32:
+            for i in range(self.n):
+                h64[i] = _Obj64(i)
+            for i in range(half):
+                h64[2 * i + 1] = p64
+            for i in range(half):
+                t0 = self.core.get_rtio_counter_mu()
+                r32[i] = _Obj32(i)
+                t1 = self.core.get_rtio_counter_mu()
+                self.ts[i] = self.core.mu_to_seconds(t1 - t0)
+        elif which == PAT_REUSE_32_64:
+            for i in range(self.n):
+                h32[i] = _Obj32(i)
+            for i in range(half):
+                h32[2 * i + 1] = p32
+            for i in range(half):
+                t0 = self.core.get_rtio_counter_mu()
+                r64[i] = _Obj64(i)
+                t1 = self.core.get_rtio_counter_mu()
+                self.ts[i] = self.core.mu_to_seconds(t1 - t0)
+
+    # As with ``_AllocTiming``, one entry point per mode. The holders are
+    # allocated before ``with critical(...)``, since they do not fit in a cell.
+
+    @kernel
+    def pattern_rc(self, which: int32):
+        p32 = _Obj32(0)
+        p64 = _Obj64(0)
+        h32 = [p32 for _ in range(self.n)]
+        h64 = [p64 for _ in range(self.n)]
+        r32 = [p32 for _ in range(self.n // 2)]
+        r64 = [p64 for _ in range(self.n // 2)]
+        self._pattern(which, p32, p64, h32, h64, r32, r64)
+
+    @kernel
+    def pattern_ctrc(self, which: int32):
+        p32 = _Obj32(0)
+        p64 = _Obj64(0)
+        h32 = [p32 for _ in range(self.n)]
+        h64 = [p64 for _ in range(self.n)]
+        r32 = [p32 for _ in range(self.n // 2)]
+        r64 = [p64 for _ in range(self.n // 2)]
+        with critical(_CTRC_PAGES):
+            self._pattern(which, p32, p64, h32, h64, r32, r64)
+
+
 class _AllocTimingMixin:
     """Test bodies shared by the RC and CTRC classes. Not a TestCase itself."""
 
@@ -156,6 +302,17 @@ class _AllocTimingMixin:
         else:
             exp.bench_rc(which)
         ts = numpy.array(exp.ts)
+        self._record(name, ts)
+
+    def _bench_pattern(self, name, which, count):
+        exp = self.create(_AllocPattern, n=self.n)
+        if self.ctrc:
+            exp.pattern_ctrc(which)
+        else:
+            exp.pattern_rc(which)
+        self._record(name, numpy.array(exp.ts[:count]))
+
+    def _record(self, name, ts):
         self.results.append((name, ts.mean(), ts.std(), ts.max()))
         # Loose sanity bound only; the comparison is done by eye across the
         # two tables.
@@ -184,6 +341,21 @@ class _AllocTimingMixin:
 
     def test_exception(self):
         self._bench("exception", WL_EXCEPTION)
+
+    def test_pattern_fill_32(self):
+        self._bench_pattern("pattern_fill_32", PAT_FILL_32, self.n)
+
+    def test_pattern_fill_64(self):
+        self._bench_pattern("pattern_fill_64", PAT_FILL_64, self.n)
+
+    def test_pattern_interleaved(self):
+        self._bench_pattern("pattern_interleaved", PAT_INTERLEAVED, self.n)
+
+    def test_pattern_reuse_64_32(self):
+        self._bench_pattern("pattern_reuse_64_32", PAT_REUSE_64_32, self.n // 2)
+
+    def test_pattern_reuse_32_64(self):
+        self._bench_pattern("pattern_reuse_32_64", PAT_REUSE_32_64, self.n // 2)
 
 
 class AllocTimingRCTest(_AllocTimingMixin, ExperimentCase):
