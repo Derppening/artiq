@@ -289,11 +289,13 @@ class _AllocTimingMixin:
         width = max(len(r[0]) for r in cls.results)
         print()
         print("{} (n={}, ctrc={})".format(cls.__name__, cls.n, cls.ctrc))
-        print("| {} | mean (us) |  std (us) |  max (us) |".format("workload".ljust(width)))
-        print("| {} | --------- | --------- | --------- |".format("-" * width))
-        for name, mean, std, mx in cls.results:
-            print("| {} | {:>9.3f} | {:>9.3f} | {:>9.3f} |".format(
-                name.ljust(width), mean * 1e6, std * 1e6, mx * 1e6))
+        cols = ("max", "q3", "mean", "q1", "min")
+        print("| {} | {} |".format("workload".ljust(width),
+                                    " | ".join("{:>4} (us)".format(c) for c in cols)))
+        print("| {} | {} |".format("-" * width, " | ".join(["-" * 9] * len(cols))))
+        for name, *stats in cls.results:
+            print("| {} | {} |".format(
+                name.ljust(width), " | ".join("{:>9.3f}".format(v * 1e6) for v in stats)))
 
     def _bench(self, name, which):
         exp = self.create(_AllocTiming, n=self.n)
@@ -313,7 +315,8 @@ class _AllocTimingMixin:
         self._record(name, numpy.array(exp.ts[:count]))
 
     def _record(self, name, ts):
-        self.results.append((name, ts.mean(), ts.std(), ts.max()))
+        q3, q1 = numpy.percentile(ts, [75, 25])
+        self.results.append((name, ts.max(), q3, ts.mean(), q1, ts.min()))
         # Loose sanity bound only; the comparison is done by eye across the
         # two tables.
         self.assertLess(ts.mean(), 1 * ms)
