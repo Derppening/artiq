@@ -18,8 +18,7 @@ const MAGIC_END:  usize = 0xE0DE0DE0;
 #[derive(Debug)]
 struct Header {
     magic: usize,
-    size:  usize,
-    _pad:  [usize; 2]
+    size:  usize
 }
 
 // Free list links, stored at the start of a free block's payload. Every block
