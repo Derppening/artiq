@@ -6,16 +6,20 @@ use core::cell::Cell;
 
 const MAGIC_FREE: usize = 0xDEADDEAD;
 const MAGIC_BUSY: usize = 0xFEEDFEED;
+const MAGIC_END:  usize = 0xE0DE0DE0;
 
 // Headers are kept aligned to their own size and block sizes are multiples of
 // it, so payloads are aligned to the header size without padding blocks.
+//
+// Blocks in a region are contiguous, so the block after a header is at
+// `following(header)`. Each region ends with a header of magic `MAGIC_END`
+// and no payload, which stops joins and walks at the end of the region. Its
+// `size` holds the first block of the next region to walk, or 0 for none.
 #[derive(Debug)]
 struct Header {
     magic: usize,
     size:  usize,
-    // Next block in memory order, busy or free.
-    next:  *mut Header,
-    _pad:  usize
+    _pad:  [usize; 2]
 }
 
 // Free list links, stored at the start of a free block's payload. Every block
@@ -26,7 +30,7 @@ struct Links {
 }
 
 pub struct ListAlloc {
-    // All blocks, in memory order within each region.
+    // First block of the most recently added region.
     root:  *mut Header,
     // Free blocks only, most recently freed first.
     free:  Cell<*mut Header>
@@ -41,9 +45,38 @@ unsafe fn links(header: *mut Header) -> *mut Links {
     header.offset(1) as *mut Links
 }
 
+unsafe fn following(header: *mut Header) -> *mut Header {
+    let offset = mem::size_of::<Header>() + (*header).size;
+    (header as *mut u8).offset(offset as isize) as *mut Header
+}
+
+// All headers in all regions, in memory order within each region, end markers
+// included. Stops after the first header with an unknown magic.
+struct Blocks {
+    curr: *mut Header
+}
+
+impl Iterator for Blocks {
+    type Item = *mut Header;
+
+    fn next(&mut self) -> Option<*mut Header> {
+        let header = self.curr;
+        if header.is_null() { return None }
+        unsafe {
+            self.curr = match (*header).magic {
+                MAGIC_FREE | MAGIC_BUSY => following(header),
+                MAGIC_END => (*header).size as *mut Header,
+                _ => ptr::null_mut()
+            };
+        }
+        Some(header)
+    }
+}
+
 /// Occupancy of a `ListAlloc`. Block headers are counted with the block they
-/// precede, so `busy + idle` is the total size of all added regions, after
-/// trimming them to header alignment.
+/// precede, and the header ending each region is counted as busy, so
+/// `busy + idle` is the total size of all added regions, after trimming them
+/// to header alignment.
 #[derive(Debug, Clone, Copy)]
 pub struct Stats {
     /// Bytes in busy blocks, headers included.
@@ -59,17 +92,24 @@ pub struct Stats {
 }
 
 impl ListAlloc {
+    unsafe fn blocks(&self) -> Blocks {
+        Blocks { curr: self.root }
+    }
+
     pub unsafe fn stats(&self) -> Stats {
         let header_size = mem::size_of::<Header>();
         let mut stats = Stats { busy: 0, idle: 0, largest_free: 0 };
         // payload of the current run of free blocks, as one block after joining
         let mut run: Option<usize> = None;
 
-        let mut curr = self.root;
-        while !curr.is_null() {
+        for curr in self.blocks() {
             match (*curr).magic {
                 MAGIC_BUSY => {
                     stats.busy += header_size + (*curr).size;
+                    run = None;
+                }
+                MAGIC_END => {
+                    stats.busy += header_size;
                     run = None;
                 }
                 MAGIC_FREE => {
@@ -83,7 +123,6 @@ impl ListAlloc {
                 }
                 _ => panic!("heap corruption detected at {:p}", curr)
             }
-            curr = (*curr).next;
         }
 
         stats
@@ -92,13 +131,18 @@ impl ListAlloc {
     pub unsafe fn add(&mut self, ptr: *mut u8, size: usize) {
         let header_size = mem::size_of::<Header>();
         let padding = (header_size - ptr as usize % header_size) % header_size;
-        if size < padding + header_size * 2 { return }
+        // a block with a payload of one header, and the end marker
+        if size < padding + header_size * 3 { return }
         let size = (size - padding) / header_size * header_size;
 
         let curr = ptr.offset(padding as isize) as *mut Header;
         (*curr).magic = MAGIC_FREE;
-        (*curr).size  = size - header_size;
-        (*curr).next  = self.root;
+        (*curr).size  = size - header_size * 2;
+
+        let end = following(curr);
+        (*end).magic = MAGIC_END;
+        (*end).size  = self.root as usize;
+
         self.root = curr;
         self.push_free(curr);
     }
@@ -159,8 +203,6 @@ unsafe impl GlobalAlloc for ListAlloc {
             let next = (header as *mut u8).offset(offset as isize) as *mut Header;
             (*next).magic = MAGIC_FREE;
             (*next).size  = (*header).size - offset;
-            (*next).next  = (*header).next;
-            (*header).next  = next;
             (*header).size  = split_size;
             next
         }
@@ -171,14 +213,14 @@ unsafe impl GlobalAlloc for ListAlloc {
                 panic!("heap corruption detected at {:p}", curr)
             }
 
-            let mut next = (*curr).next;
-            while !next.is_null() && (*next).magic == MAGIC_FREE {
+            // The end marker is not free, so this stops at the end of the region
+            let mut next = following(curr);
+            while (*next).magic == MAGIC_FREE {
                 // Join
                 self.unlink_free(next);
                 (*next).magic = 0;
                 (*curr).size += (*next).size + header_size;
-                (*curr).next  = (*next).next;
-                next = (*curr).next;
+                next = following(curr);
             }
 
             // Case 1: Memory can be allocated straight from the current chunk
@@ -239,24 +281,21 @@ impl fmt::Display for ListAlloc {
             let mut total_idle = 0;
             let mut total_meta = 0;
 
-            let mut curr = self.root;
-            while !curr.is_null() {
+            for curr in self.blocks() {
                 total_meta += mem::size_of::<Header>();
 
                 let desc = match (*curr).magic {
                     MAGIC_FREE => { total_idle += (*curr).size; "IDLE" },
                     MAGIC_BUSY => { total_busy += (*curr).size; "BUSY" },
+                    MAGIC_END => {
+                        write!(f, "END  {:p} + {:#x} -> {:p}\n",
+                               curr, mem::size_of::<Header>(), (*curr).size as *mut Header)?;
+                        continue
+                    }
                     _ => "!!!!"
                 };
-
-                write!(f, "{} {:p} + {:#x} + {:#x} -> {:p}\n",
-                       desc, curr, mem::size_of::<Header>(), (*curr).size, (*curr).next)?;
-                match (*curr).magic {
-                    MAGIC_FREE | MAGIC_BUSY => (),
-                    _ => break
-                }
-
-                curr = (*curr).next;
+                write!(f, "{} {:p} + {:#x} + {:#x}\n",
+                       desc, curr, mem::size_of::<Header>(), (*curr).size)?;
             }
 
             write!(f, " === busy: {:#x} idle: {:#x} meta: {:#x} total: {:#x}\n",
